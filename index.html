@@ -97,7 +97,12 @@
         let localStream;
 
         // 獲取相機視頻流
-        navigator.mediaDevices.getUserMedia({ video: true })
+        function startVideoStream() {
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment' // 使用後置攝像頭
+                }
+            })
             .then(stream => {
                 video.srcObject = stream;
                 localStream = stream;
@@ -106,6 +111,10 @@
                 alert('無法訪問相機: ' + error);
                 console.error('Error accessing camera:', error);
             });
+        }
+
+        // 初始化视频流
+        startVideoStream();
 
         // 拍照功能並直接傳送圖片
         function takeSnapshot() {
@@ -122,14 +131,14 @@
             const dataURL = offscreenCanvas.toDataURL('image/png');
             preview.src = dataURL;
             preview.style.display = 'block';
-            
+
             // 自動傳送圖片
             sendImage(dataURL);
 
-            // 在稍後恢復視頻播放，避免暫停
+            // 在稍後重新啟動視頻流，避免暫停
             setTimeout(() => {
-                video.play();
-            }, 1000); // 延遲播放1秒以確保處理完成
+                restartVideoStream();
+            }, 1000); // 延遲1秒後重新啟動
         }
 
         // 傳送圖片功能
@@ -155,6 +164,14 @@
                 alert('API回覆時出錯');
                 console.error('Error:', error);
             });
+        }
+
+        // 重新啟動視頻流
+        function restartVideoStream() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            startVideoStream();
         }
     </script>
 </body>
