@@ -109,11 +109,19 @@
             .then(data => {
                 processModal.style.display = 'none';
                 alert(`API回覆: ${data.message}`);
+                // 確保視頻繼續播放
+                if (video.paused) {
+                    video.play();
+                }
             })
             .catch(error => {
                 processModal.style.display = 'none';
                 alert('API回覆時出錯');
                 console.error('Error:', error);
+                // 確保視頻繼續播放
+                if (video.paused) {
+                    video.play();
+                }
             });
         }
     </script>
