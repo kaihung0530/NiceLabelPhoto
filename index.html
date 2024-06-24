@@ -91,7 +91,7 @@
     </style>
 </head>
 <body>
-    <h1>拍照示例V05</h1>
+    <h1>拍照示例V06</h1>
     <video id="video" width="640" height="480" autoplay></video>
     <button id="snap">拍照</button>
     <div id="photos"></div>
@@ -124,7 +124,7 @@
         .then(function(stream) {
             var video = document.getElementById('video');
             video.srcObject = stream;
-            video.play();
+            await video.play();
         })
         .catch(function(err) {
             console.error("访问摄像头时发生错误: " + err);
