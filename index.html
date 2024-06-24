@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拍照示例V08</title>
+    <title>拍照示例V09</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -96,7 +96,7 @@
     </style>
 </head>
 <body>
-    <h1>拍照示例V08</h1>
+    <h1>拍照示例V09</h1>
     <video id="video" width="640" height="480"></video>
     <button id="start">启用摄像头</button>
     <button id="snap">拍照</button>
@@ -134,6 +134,7 @@
                 alert("无法访问摄像头: " + error.message);
             }
         }
+
         // 显示模态窗口
         function showModal() {
             document.getElementById('modal').style.display = 'flex';
@@ -144,72 +145,74 @@
             document.getElementById('modal').style.display = 'none';
         }
 
+        // 启动摄像头按钮点击事件
+        startButton.addEventListener('click', startCamera);
+
+        // 检查设备是否支持摄像头
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            startButton.style.display = 'inline-block';
+        } else {
+            alert("你的设备不支持摄像头访问。");
+        }
+
         // 拍照并显示在下面
-        document.getElementById('snap').addEventListener('click', function() {
-            var canvas = document.createElement('canvas');
-            canvas.width = 640;
-            canvas.height = 480;
-            var context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, 640, 480);
+        snapButton.addEventListener('click', function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             // 将拍摄的图片显示在页面上
-            var img = document.createElement('img');
-            var imageBase64 = canvas.toDataURL('image/png');
+            const img = document.createElement('img');
+            const imageBase64 = canvas.toDataURL('image/png');
             img.src = imageBase64;
             document.getElementById('photos').appendChild(img);
-			
 
+            // 显示模态窗口
+            showModal();
             
             // 定义API URL
-            /*var apiURL = 'https://labelcloudapi.onnicelabel.com/Print/v2/Print'; // 替换为你的API URL
-			var base64Data = imageBase64.split(',')[1];
-			
+            /*const apiURL = 'https://labelcloudapi.onnicelabel.com/Print/v2/Print'; // 替换为你的API URL
+            const base64Data = imageBase64.split(',')[1];
+
             // 准备发送的JSON数据
-            var jsonData = {
-					"deviceType":"CloudPrinter",
-					"deviceId":{
-					"printerName":"SYSTEX_ZT231",
-					"workstation":null
-				},
-					"filePath":"/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
-					"fileRevision":"",
-					"labelName":"",
-					"quantity":"1",
-					"dataSources":
-					[
-					  {
-					  "PIC": base64Data
-					  }
-					]
-				};
-				
-			// 显示模态窗口
-            showModal();
+            const jsonData = {
+                "deviceType": "CloudPrinter",
+                "deviceId": {
+                    "printerName": "SYSTEX_ZT231",
+                    "workstation": null
+                },
+                "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
+                "fileRevision": "",
+                "labelName": "",
+                "quantity": "1",
+                "dataSources": [
+                    {"PIC": base64Data}
+                ]
+            };
+
             // 调用API并传递JSON数据
             fetch(apiURL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-					'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
                 },
                 body: JSON.stringify(jsonData)
             })
             .then(response => response.json())
             .then(data => {
-                //console.log('成功:', data);
-                alert('API請求成功：' + JSON.stringify(data));
+                console.log('成功:', data);
+                alert('API请求成功：' + JSON.stringify(data));
                 hideModal();
-
             })
             .catch(error => {
-                //console.error('错误:', error);
                 console.error('错误:', error);
-                alert('API請求失敗：' + error);
+                alert('API请求失败：' + error);
                 hideModal();
-
             });*/
         });
     </script>
-
 </body>
 </html>
