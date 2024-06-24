@@ -144,7 +144,23 @@
         // 傳送圖片功能
         function sendImage(dataURL) {
             const base64Image = dataURL.split(',')[1];
-            const data = { image: base64Image };
+            //const data = { image: base64Image };
+			const data = {
+							"deviceType":"CloudPrinter",
+							"deviceId":{
+							"printerName":"SYSTEX_ZT231",
+							"workstation":null
+						},
+							"filePath":"/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
+							"fileRevision":"",
+							"labelName":"",
+							"quantity":"1",
+							"dataSources":
+							[
+							  {
+							  "PIC": base64Image      }
+							]
+						};
 
             processModal.style.display = 'block';
 
