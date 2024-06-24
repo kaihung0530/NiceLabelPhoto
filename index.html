@@ -26,6 +26,19 @@
             display: block;
             margin: 20px auto;
         }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
         #processModal {
             display: none;
             position: fixed;
@@ -45,21 +58,34 @@
             padding: 20px;
             border-radius: 10px;
             display: inline-block;
+            text-align: center;
+        }
+        #loader {
+            border: 8px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 8px solid #4CAF50;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印V02</h1>
+    <h1>NiceLabel Cloud雲端列印V03</h1>
     <div id="cameraContainer">
         <video id="video" autoplay playsinline></video>
         <button onclick="takeSnapshot()">拍照</button>
         <canvas id="canvas" style="display:none;"></canvas>
         <img id="preview" src="" alt="預覽圖片" style="display:none;">
-        <br>
-        <button onclick="sendImage()">傳送圖片</button>
     </div>
     <div id="processModal">
         <div class="modal-content">
+            <div id="loader"></div>
             <p>正在處理中，請稍後...</p>
         </div>
     </div>
@@ -81,7 +107,7 @@
                 console.error('Error accessing camera:', error);
             });
 
-        // 拍照功能
+        // 拍照功能並直接傳送圖片
         function takeSnapshot() {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
@@ -90,11 +116,14 @@
             const dataURL = canvas.toDataURL('image/png');
             preview.src = dataURL;
             preview.style.display = 'block';
+            
+            // 自動傳送圖片
+            sendImage(dataURL);
         }
 
         // 傳送圖片功能
-        function sendImage() {
-            const base64Image = canvas.toDataURL('image/png').split(',')[1];
+        function sendImage(dataURL) {
+            const base64Image = dataURL.split(',')[1];
             const data = { image: base64Image };
 
             processModal.style.display = 'block';
