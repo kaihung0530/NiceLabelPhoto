@@ -17,13 +17,13 @@
             padding: 1em;
             margin: 0;
         }
-        #imageContainer {
-            margin-top: 20px;
+        #cameraContainer {
+            margin: 20px 0;
         }
-        #preview {
+        video, canvas {
             width: 100%;
             max-width: 300px;
-            display: none;
+            display: block;
             margin: 20px auto;
         }
         #processModal {
@@ -49,10 +49,12 @@
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印V01</h1>
-    <div id="imageContainer">
-        <input type="file" id="imageInput" accept="image/*" capture="camera">
-        <img id="preview" src="" alt="預覽圖片">
+    <h1>NiceLabel Cloud雲端列印</h1>
+    <div id="cameraContainer">
+        <video id="video" autoplay playsinline></video>
+        <button onclick="takeSnapshot()">拍照</button>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <img id="preview" src="" alt="預覽圖片" style="display:none;">
         <br>
         <button onclick="sendImage()">傳送圖片</button>
     </div>
@@ -62,53 +64,57 @@
         </div>
     </div>
     <script>
-        const imageInput = document.getElementById('imageInput');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
         const preview = document.getElementById('preview');
         const processModal = document.getElementById('processModal');
+        let localStream;
 
-        imageInput.addEventListener('change', () => {
-            const file = imageInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    preview.src = e.target.result;
-                    preview.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+        // 獲取相機視頻流
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                localStream = stream;
+            })
+            .catch(error => {
+                alert('無法訪問相機: ' + error);
+                console.error('Error accessing camera:', error);
+            });
 
+        // 拍照功能
+        function takeSnapshot() {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataURL = canvas.toDataURL('image/png');
+            preview.src = dataURL;
+            preview.style.display = 'block';
+        }
+
+        // 傳送圖片功能
         function sendImage() {
-            const file = imageInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64Image = e.target.result.split(',')[1];
-                    const data = { image: base64Image };
+            const base64Image = canvas.toDataURL('image/png').split(',')[1];
+            const data = { image: base64Image };
 
-                    processModal.style.display = 'block';
+            processModal.style.display = 'block';
 
-                    fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', { // 替換為你的API URL
+            fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', { // 替換為你的API URL
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json',
 								   'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'						},
                         body: JSON.stringify(data)
                     })
-                    .then(response => response.json())
-                    .then(data => {
-                        processModal.style.display = 'none';
-                        alert(`API回覆: ${data.message}`);
-                    })
-                    .catch(error => {
-                        processModal.style.display = 'none';
-                        alert('API回覆時出錯');
-                        console.error('Error:', error);
-                    });
-                };
-                reader.readAsDataURL(file);
-            } else {
-                alert('請選擇一張圖片');
-            }
+            .then(response => response.json())
+            .then(data => {
+                processModal.style.display = 'none';
+                alert(`API回覆: ${data.message}`);
+            })
+            .catch(error => {
+                processModal.style.display = 'none';
+                alert('API回覆時出錯');
+                console.error('Error:', error);
+            });
         }
     </script>
 </body>
