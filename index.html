@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拍照示例V04</title>
+    <title>拍照示例V05</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,10 +22,7 @@
         }
 
         #video {
-            border: 2px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            margin-top: 20px;
+			object-fit: cover;
         }
 
         #snap {
@@ -94,7 +91,7 @@
     </style>
 </head>
 <body>
-    <h1>拍照示例</h1>
+    <h1>拍照示例V05</h1>
     <video id="video" width="640" height="480" autoplay></video>
     <button id="snap">拍照</button>
     <div id="photos"></div>
@@ -117,34 +114,13 @@
             <!-- console.error("发生错误: " + err); -->
         <!-- }); -->
         // 请求用户摄像头权限
-        <!-- navigator.mediaDevices.getUserMedia({ -->
-            <!-- video: { -->
-                <!-- facingMode: "environment", // 尝试使用后置摄像头 -->
-                <!-- width: { ideal: 640 }, -->
-                <!-- height: { ideal: 480 } -->
-            <!-- } -->
-        <!-- }) -->
-		
-        // 启动摄像头函数
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment", // 使用后置摄像头
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    }
-                });
-
-                video.srcObject = stream;
-                await video.play(); // 确保视频播放
-                <!-- startButton.style.display = 'none'; -->
-                <!-- snapButton.style.display = 'inline-block'; -->
-            } catch (error) {
-                console.error("访问摄像头时发生错误: " + error);
-                alert("无法访问摄像头: " + error.message);
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "environment", // 尝试使用后置摄像头
+                width: { ideal: 640 },
+                height: { ideal: 480 }
             }
-        }
+        })
         .then(function(stream) {
             var video = document.getElementById('video');
             video.srcObject = stream;
