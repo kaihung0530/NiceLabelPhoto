@@ -76,7 +76,7 @@
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印V05</h1>
+    <h1>NiceLabel Cloud雲端列印</h1>
     <div id="cameraContainer">
         <video id="video" autoplay playsinline></video>
         <button onclick="takeSnapshot()">拍照</button>
@@ -96,8 +96,16 @@
         const processModal = document.getElementById('processModal');
         let localStream;
 
-        // 獲取相機視頻流
-        navigator.mediaDevices.getUserMedia({ video: true })
+        // 獲取相機視頻流，優先使用後置攝像頭
+        const constraints = {
+            video: {
+                facingMode: 'environment', // 使用後置攝像頭
+                width: { ideal: 1280 }, // 設置寬度（可選）
+                height: { ideal: 720 } // 設置高度（可選）
+            }
+        };
+
+        navigator.mediaDevices.getUserMedia(constraints)
             .then(stream => {
                 video.srcObject = stream;
                 localStream = stream;
