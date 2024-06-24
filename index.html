@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拍照示例V05</title>
+    <title>拍照示例V08</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,7 +12,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start; /* Align items to the top */
+            justify-content: flex-start;
             min-height: 100vh;
         }
 
@@ -22,10 +22,15 @@
         }
 
         #video {
-			object-fit: cover;
+            border: 2px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin-top: 20px;
+            max-width: 100%;
+            height: auto;
         }
 
-        #snap {
+        #snap, #start {
             background-color: #007bff;
             color: white;
             border: none;
@@ -35,9 +40,10 @@
             cursor: pointer;
             margin-top: 20px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: none;
         }
 
-        #snap:hover {
+        #snap:hover, #start:hover {
             background-color: #0056b3;
         }
 
@@ -59,9 +65,10 @@
             max-width: 100%;
             height: auto;
         }
-		
+
+        /* 模态窗口的样式 */
         #modal {
-            display: none; 
+            display: none;
             position: fixed;
             z-index: 1000;
             left: 0;
@@ -86,51 +93,27 @@
             margin: 0;
             font-size: 18px;
         }
-		
-
     </style>
 </head>
 <body>
-    <h1>拍照示例V07</h1>
-    <video id="video" width="640" height="480" autoplay></video>
+    <h1>拍照示例V08</h1>
+    <video id="video" width="640" height="480"></video>
+    <button id="start">启用摄像头</button>
     <button id="snap">拍照</button>
     <div id="photos"></div>
+
     <!-- 模态窗口 -->
     <div id="modal">
         <div id="modal-content">
-            <p>正在處理，請稍後...</p>
+            <p>正在处理，请稍候...</p>
         </div>
     </div>
 
     <script>
-        <!-- // 访问用户的摄像头 -->
-        <!-- navigator.mediaDevices.getUserMedia({ video: true }) -->
-        <!-- .then(function(stream) { -->
-            <!-- var video = document.getElementById('video'); -->
-            <!-- video.srcObject = stream; -->
-            <!-- video.play(); -->
-        <!-- }) -->
-        <!-- .catch(function(err) { -->
-            <!-- console.error("发生错误: " + err); -->
-        <!-- }); -->
-        // 请求用户摄像头权限
-        /*navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: "environment", // 尝试使用后置摄像头
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            }
-        })
-        .then(function(stream) {
-            var video = document.getElementById('video');
-            video.srcObject = stream;
-             video.play();
-        })
-        .catch(function(err) {
-            console.error("访问摄像头时发生错误: " + err);
-            alert("无法访问摄像头: " + err.message);
-        });*/
-		
+        const video = document.getElementById('video');
+        const startButton = document.getElementById('start');
+        const snapButton = document.getElementById('snap');
+
         // 启动摄像头函数
         async function startCamera() {
             try {
@@ -144,8 +127,8 @@
 
                 video.srcObject = stream;
                 await video.play(); // 确保视频播放
-                /*startButton.style.display = 'none';
-                snapButton.style.display = 'inline-block';*/
+                startButton.style.display = 'none';
+                snapButton.style.display = 'inline-block';
             } catch (error) {
                 console.error("访问摄像头时发生错误: " + error);
                 alert("无法访问摄像头: " + error.message);
