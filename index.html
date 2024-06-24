@@ -49,7 +49,7 @@
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印</h1>
+    <h1>NiceLabel Cloud雲端列印V01</h1>
     <div id="imageContainer">
         <input type="file" id="imageInput" accept="image/*" capture="camera">
         <img id="preview" src="" alt="預覽圖片">
@@ -88,21 +88,22 @@
 
                     processModal.style.display = 'block';
 
-                    <!-- fetch('https://example.com/api/upload', { // 替換為你的API URL -->
-                        <!-- method: 'POST', -->
-                        <!-- headers: { 'Content-Type': 'application/json' }, -->
-                        <!-- body: JSON.stringify(data) -->
-                    <!-- }) -->
-                    <!-- .then(response => response.json()) -->
-                    <!-- .then(data => { -->
-                        <!-- processModal.style.display = 'none'; -->
-                        <!-- alert(`API回覆: ${data.message}`); -->
-                    <!-- }) -->
-                    <!-- .catch(error => { -->
-                        <!-- processModal.style.display = 'none'; -->
-                        <!-- alert('API回覆時出錯'); -->
-                        <!-- console.error('Error:', error); -->
-                    <!-- }); -->
+                    fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', { // 替換為你的API URL
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json',
+								   'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'						},
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        processModal.style.display = 'none';
+                        alert(`API回覆: ${data.message}`);
+                    })
+                    .catch(error => {
+                        processModal.style.display = 'none';
+                        alert('API回覆時出錯');
+                        console.error('Error:', error);
+                    });
                 };
                 reader.readAsDataURL(file);
             } else {
