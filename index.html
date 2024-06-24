@@ -76,7 +76,7 @@
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印V03</h1>
+    <h1>NiceLabel Cloud雲端列印V04</h1>
     <div id="cameraContainer">
         <video id="video" autoplay playsinline></video>
         <button onclick="takeSnapshot()">拍照</button>
@@ -152,6 +152,10 @@
                     video.play();
                 }
             });
+			// 確保視頻繼續播放
+                if (video.paused) {
+                    video.play();
+                }
         }
     </script>
 </body>
