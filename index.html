@@ -3,216 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拍照示例V09</title>
+    <title>NiceLabel Cloud雲端列印</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            text-align: center;
             margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
+            padding: 0;
         }
-
         h1 {
-            color: #333;
-            margin-top: 20px;
-        }
-
-        #video {
-            border: 2px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            margin-top: 20px;
-            max-width: 100%;
-            height: auto;
-        }
-
-        #snap, #start {
-            background-color: #007bff;
+            background-color: #4CAF50;
             color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            display: none;
+            padding: 1em;
+            margin: 0;
         }
-
-        #snap:hover, #start:hover {
-            background-color: #0056b3;
-        }
-
-        #photos {
+        #imageContainer {
             margin-top: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
+        }
+        #preview {
             width: 100%;
-            padding: 0 20px;
-            box-sizing: border-box;
+            max-width: 300px;
+            display: none;
+            margin: 20px auto;
         }
-
-        #photos img {
-            border: 2px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            max-width: 100%;
-            height: auto;
-        }
-
-        /* 模态窗口的样式 */
-        #modal {
+        #processModal {
             display: none;
             position: fixed;
-            z-index: 1000;
+            z-index: 999;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.4);
-            align-items: center;
-            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            text-align: center;
         }
-
-        #modal-content {
+        #processModal .modal-content {
+            position: relative;
+            top: 50%;
+            transform: translateY(-50%);
             background-color: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            text-align: center;
-        }
-
-        #modal-content p {
-            margin: 0;
-            font-size: 18px;
+            display: inline-block;
         }
     </style>
 </head>
 <body>
-    <h1>拍照示例V09</h1>
-    <video id="video" width="640" height="480"></video>
-    <button id="start">启用摄像头</button>
-    <button id="snap">拍照</button>
-    <div id="photos"></div>
-
-    <!-- 模态窗口 -->
-    <div id="modal">
-        <div id="modal-content">
-            <p>正在处理，请稍候...</p>
+    <h1>NiceLabel Cloud雲端列印</h1>
+    <div id="imageContainer">
+        <input type="file" id="imageInput" accept="image/*" capture="camera">
+        <img id="preview" src="" alt="預覽圖片">
+        <br>
+        <button onclick="sendImage()">傳送圖片</button>
+    </div>
+    <div id="processModal">
+        <div class="modal-content">
+            <p>正在處理中，請稍後...</p>
         </div>
     </div>
-
     <script>
-        const video = document.getElementById('video');
-        const startButton = document.getElementById('start');
-        const snapButton = document.getElementById('snap');
+        const imageInput = document.getElementById('imageInput');
+        const preview = document.getElementById('preview');
+        const processModal = document.getElementById('processModal');
 
-        // 启动摄像头函数
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment", // 使用后置摄像头
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    }
-                });
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
-                video.srcObject = stream;
-                await video.play(); // 确保视频播放
-                startButton.style.display = 'none';
-                snapButton.style.display = 'inline-block';
-            } catch (error) {
-                console.error("访问摄像头时发生错误: " + error);
-                alert("无法访问摄像头: " + error.message);
+        function sendImage() {
+            const file = imageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64Image = e.target.result.split(',')[1];
+                    const data = { image: base64Image };
+
+                    processModal.style.display = 'block';
+
+                    <!-- fetch('https://example.com/api/upload', { // 替換為你的API URL -->
+                        <!-- method: 'POST', -->
+                        <!-- headers: { 'Content-Type': 'application/json' }, -->
+                        <!-- body: JSON.stringify(data) -->
+                    <!-- }) -->
+                    <!-- .then(response => response.json()) -->
+                    <!-- .then(data => { -->
+                        <!-- processModal.style.display = 'none'; -->
+                        <!-- alert(`API回覆: ${data.message}`); -->
+                    <!-- }) -->
+                    <!-- .catch(error => { -->
+                        <!-- processModal.style.display = 'none'; -->
+                        <!-- alert('API回覆時出錯'); -->
+                        <!-- console.error('Error:', error); -->
+                    <!-- }); -->
+                };
+                reader.readAsDataURL(file);
+            } else {
+                alert('請選擇一張圖片');
             }
         }
-
-        // 显示模态窗口
-        function showModal() {
-            document.getElementById('modal').style.display = 'flex';
-        }
-
-        // 隐藏模态窗口
-        function hideModal() {
-            document.getElementById('modal').style.display = 'none';
-        }
-
-        // 启动摄像头按钮点击事件
-        startButton.addEventListener('click', startCamera);
-
-        // 检查设备是否支持摄像头
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            startButton.style.display = 'inline-block';
-        } else {
-            alert("你的设备不支持摄像头访问。");
-        }
-
-        // 拍照并显示在下面
-        snapButton.addEventListener('click', function() {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // 将拍摄的图片显示在页面上
-            const img = document.createElement('img');
-            const imageBase64 = canvas.toDataURL('image/png');
-            img.src = imageBase64;
-            document.getElementById('photos').appendChild(img);
-
-            // 显示模态窗口
-            showModal();
-            
-            // 定义API URL
-            /*const apiURL = 'https://labelcloudapi.onnicelabel.com/Print/v2/Print'; // 替换为你的API URL
-            const base64Data = imageBase64.split(',')[1];
-
-            // 准备发送的JSON数据
-            const jsonData = {
-                "deviceType": "CloudPrinter",
-                "deviceId": {
-                    "printerName": "SYSTEX_ZT231",
-                    "workstation": null
-                },
-                "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
-                "fileRevision": "",
-                "labelName": "",
-                "quantity": "1",
-                "dataSources": [
-                    {"PIC": base64Data}
-                ]
-            };
-
-            // 调用API并传递JSON数据
-            fetch(apiURL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
-                },
-                body: JSON.stringify(jsonData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('成功:', data);
-                alert('API请求成功：' + JSON.stringify(data));
-                hideModal();
-            })
-            .catch(error => {
-                console.error('错误:', error);
-                alert('API请求失败：' + error);
-                hideModal();
-            });*/
-        });
     </script>
 </body>
 </html>
