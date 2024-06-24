@@ -12,7 +12,7 @@
             padding: 0;
         }
         h1 {
-            background-color: #4CAF50;
+            background-color: #005EB8; /* Loftware藍 */
             color: white;
             padding: 1em;
             margin: 0;
@@ -29,7 +29,7 @@
         button {
             padding: 15px 30px;
             font-size: 18px;
-            background-color: #4CAF50;
+            background-color: #005EB8; /* Loftware藍 */
             color: white;
             border: none;
             border-radius: 5px;
@@ -37,7 +37,7 @@
             margin: 10px 0;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #004a91; /* 深藍色，點擊效果 */
         }
         #processModal {
             display: none;
@@ -63,7 +63,7 @@
         #loader {
             border: 8px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 8px solid #4CAF50;
+            border-top: 8px solid #005EB8; /* Loftware藍 */
             width: 50px;
             height: 50px;
             animation: spin 1s linear infinite;
@@ -76,7 +76,7 @@
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印V04</h1>
+    <h1>NiceLabel Cloud雲端列印V05</h1>
     <div id="cameraContainer">
         <video id="video" autoplay playsinline></video>
         <button onclick="takeSnapshot()">拍照</button>
@@ -112,13 +112,24 @@
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataURL = canvas.toDataURL('image/png');
+
+            // 使用克隆視頻流來繪製圖片
+            const offscreenCanvas = document.createElement('canvas');
+            const offscreenContext = offscreenCanvas.getContext('2d');
+            offscreenCanvas.width = canvas.width;
+            offscreenCanvas.height = canvas.height;
+            offscreenContext.drawImage(video, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+            const dataURL = offscreenCanvas.toDataURL('image/png');
             preview.src = dataURL;
             preview.style.display = 'block';
             
             // 自動傳送圖片
             sendImage(dataURL);
+
+            // 在稍後恢復視頻播放，避免暫停
+            setTimeout(() => {
+                video.play();
+            }, 1000); // 延遲播放1秒以確保處理完成
         }
 
         // 傳送圖片功能
@@ -138,24 +149,12 @@
             .then(data => {
                 processModal.style.display = 'none';
                 alert(`API回覆: ${data.message}`);
-                // 確保視頻繼續播放
-                if (video.paused) {
-                    video.play();
-                }
             })
             .catch(error => {
                 processModal.style.display = 'none';
                 alert('API回覆時出錯');
                 console.error('Error:', error);
-                // 確保視頻繼續播放
-                if (video.paused) {
-                    video.play();
-                }
             });
-			// 確保視頻繼續播放
-                if (video.paused) {
-                    video.play();
-                }
         }
     </script>
 </body>
