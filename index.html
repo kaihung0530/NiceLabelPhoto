@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拍照示例</title>
+    <title>拍照示例V04</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,7 +12,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: flex-start; /* Align items to the top */
             min-height: 100vh;
         }
 
@@ -26,11 +26,9 @@
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             margin-top: 20px;
-            max-width: 100%;
-            height: auto;
         }
 
-        #snap, #start {
+        #snap {
             background-color: #007bff;
             color: white;
             border: none;
@@ -40,10 +38,9 @@
             cursor: pointer;
             margin-top: 20px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            display: none;
         }
 
-        #snap:hover, #start:hover {
+        #snap:hover {
             background-color: #0056b3;
         }
 
@@ -65,10 +62,9 @@
             max-width: 100%;
             height: auto;
         }
-
-        /* 模态窗口的样式 */
+		
         #modal {
-            display: none;
+            display: none; 
             position: fixed;
             z-index: 1000;
             left: 0;
@@ -93,27 +89,42 @@
             margin: 0;
             font-size: 18px;
         }
+		
+
     </style>
 </head>
 <body>
-    <h1>拍照示例V03</h1>
-    <video id="video" width="640" height="480"></video>
-    <button id="start">启用摄像头</button>
+    <h1>拍照示例</h1>
+    <video id="video" width="640" height="480" autoplay></video>
     <button id="snap">拍照</button>
     <div id="photos"></div>
-
     <!-- 模态窗口 -->
     <div id="modal">
         <div id="modal-content">
-            <p>正在处理，请稍候...</p>
+            <p>正在處理，請稍後...</p>
         </div>
     </div>
 
     <script>
-        const video = document.getElementById('video');
-        const startButton = document.getElementById('start');
-        const snapButton = document.getElementById('snap');
-
+        <!-- // 访问用户的摄像头 -->
+        <!-- navigator.mediaDevices.getUserMedia({ video: true }) -->
+        <!-- .then(function(stream) { -->
+            <!-- var video = document.getElementById('video'); -->
+            <!-- video.srcObject = stream; -->
+            <!-- video.play(); -->
+        <!-- }) -->
+        <!-- .catch(function(err) { -->
+            <!-- console.error("发生错误: " + err); -->
+        <!-- }); -->
+        // 请求用户摄像头权限
+        <!-- navigator.mediaDevices.getUserMedia({ -->
+            <!-- video: { -->
+                <!-- facingMode: "environment", // 尝试使用后置摄像头 -->
+                <!-- width: { ideal: 640 }, -->
+                <!-- height: { ideal: 480 } -->
+            <!-- } -->
+        <!-- }) -->
+		
         // 启动摄像头函数
         async function startCamera() {
             try {
@@ -127,14 +138,22 @@
 
                 video.srcObject = stream;
                 await video.play(); // 确保视频播放
-                startButton.style.display = 'none';
-                snapButton.style.display = 'inline-block';
+                <!-- startButton.style.display = 'none'; -->
+                <!-- snapButton.style.display = 'inline-block'; -->
             } catch (error) {
                 console.error("访问摄像头时发生错误: " + error);
                 alert("无法访问摄像头: " + error.message);
             }
         }
-
+        .then(function(stream) {
+            var video = document.getElementById('video');
+            video.srcObject = stream;
+            video.play();
+        })
+        .catch(function(err) {
+            console.error("访问摄像头时发生错误: " + err);
+            alert("无法访问摄像头: " + err.message);
+        });
         // 显示模态窗口
         function showModal() {
             document.getElementById('modal').style.display = 'flex';
@@ -145,74 +164,72 @@
             document.getElementById('modal').style.display = 'none';
         }
 
-        // 启动摄像头按钮点击事件
-        startButton.addEventListener('click', startCamera);
-
-        // 检查设备是否支持摄像头
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            startButton.style.display = 'inline-block';
-        } else {
-            alert("你的设备不支持摄像头访问。");
-        }
-
         // 拍照并显示在下面
-        snapButton.addEventListener('click', function() {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        document.getElementById('snap').addEventListener('click', function() {
+            var canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            var context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, 640, 480);
 
             // 将拍摄的图片显示在页面上
-            const img = document.createElement('img');
-            const imageBase64 = canvas.toDataURL('image/png');
+            var img = document.createElement('img');
+            var imageBase64 = canvas.toDataURL('image/png');
             img.src = imageBase64;
             document.getElementById('photos').appendChild(img);
+			
 
-            // 显示模态窗口
-            showModal();
             
             // 定义API URL
-            const apiURL = 'https://labelcloudapi.onnicelabel.com/Print/v2/Print'; // 替换为你的API URL
-            const base64Data = imageBase64.split(',')[1];
-
+            var apiURL = 'https://labelcloudapi.onnicelabel.com/Print/v2/Print'; // 替换为你的API URL
+			var base64Data = imageBase64.split(',')[1];
+			
             // 准备发送的JSON数据
-            const jsonData = {
-                "deviceType": "CloudPrinter",
-                "deviceId": {
-                    "printerName": "SYSTEX_ZT231",
-                    "workstation": null
-                },
-                "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
-                "fileRevision": "",
-                "labelName": "",
-                "quantity": "1",
-                "dataSources": [
-                    {"PIC": base64Data}
-                ]
-            };
-
+            var jsonData = {
+					"deviceType":"CloudPrinter",
+					"deviceId":{
+					"printerName":"SYSTEX_ZT231",
+					"workstation":null
+				},
+					"filePath":"/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
+					"fileRevision":"",
+					"labelName":"",
+					"quantity":"1",
+					"dataSources":
+					[
+					  {
+					  "PIC": base64Data
+					  }
+					]
+				};
+				
+			// 显示模态窗口
+            showModal();
             // 调用API并传递JSON数据
             fetch(apiURL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+					'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
                 },
                 body: JSON.stringify(jsonData)
             })
             .then(response => response.json())
             .then(data => {
-                console.log('成功:', data);
-                alert('API请求成功：' + JSON.stringify(data));
+                //console.log('成功:', data);
+                alert('API請求成功：' + JSON.stringify(data));
                 hideModal();
+
             })
             .catch(error => {
+                //console.error('错误:', error);
                 console.error('错误:', error);
-                alert('API请求失败：' + error);
+                alert('API請求失敗：' + error);
                 hideModal();
+
             });
         });
     </script>
+
 </body>
 </html>
