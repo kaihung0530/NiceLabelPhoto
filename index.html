@@ -148,7 +148,7 @@
 			const data = {
 							"deviceType":"CloudPrinter",
 							"deviceId":{
-							"printerName":"SYSTEX_ZT231",
+							"printerName":"E4050",
 							"workstation":null
 						},
 							"filePath":"/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
@@ -173,7 +173,7 @@
             .then(response => response.json())
             .then(data => {
                 processModal.style.display = 'none';
-                alert(`API回覆: ${data.message}`);
+                alert(`API回覆: ${data}`);
             })
             .catch(error => {
                 processModal.style.display = 'none';
