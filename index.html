@@ -20,7 +20,7 @@
         #cameraContainer {
             margin: 20px 0;
         }
-        video, canvas {
+        video, canvas, img {
             width: 100%;
             max-width: 300px;
             display: block;
@@ -34,7 +34,7 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            margin: 10px 0;
+            margin: 10px 5px;
         }
         button:hover {
             background-color: #004a91; /* 深藍色，點擊效果 */
@@ -79,7 +79,11 @@
     <h1>NiceLabel Cloud雲端列印</h1>
     <div id="cameraContainer">
         <video id="video" autoplay playsinline></video>
-        <button onclick="takeSnapshot()">拍照</button>
+        <div>
+            <button id="snap" onclick="takeSnapshot()">拍照</button>
+            <button id="send" onclick="sendImage()" disabled>傳送照片</button>
+            <button id="exit" onclick="exitPage()">離開</button>
+        </div>
         <canvas id="canvas" style="display:none;"></canvas>
         <img id="preview" src="" alt="預覽圖片" style="display:none;">
     </div>
@@ -94,6 +98,8 @@
         const canvas = document.getElementById('canvas');
         const preview = document.getElementById('preview');
         const processModal = document.getElementById('processModal');
+        const sendButton = document.getElementById('send');
+        let capturedImage = null;
         let localStream;
 
         // 獲取相機視頻流
@@ -116,64 +122,58 @@
         // 初始化视频流
         startVideoStream();
 
-        // 拍照功能並直接傳送圖片
+        // 拍照功能
         function takeSnapshot() {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
-            // 使用克隆視頻流來繪製圖片
-            const offscreenCanvas = document.createElement('canvas');
-            const offscreenContext = offscreenCanvas.getContext('2d');
-            offscreenCanvas.width = canvas.width;
-            offscreenCanvas.height = canvas.height;
-            offscreenContext.drawImage(video, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-            const dataURL = offscreenCanvas.toDataURL('image/png');
-            preview.src = dataURL;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            capturedImage = canvas.toDataURL('image/png');
+            preview.src = capturedImage;
             preview.style.display = 'block';
-
-            // 自動傳送圖片
-            sendImage(dataURL);
-
-            // 在稍後重新啟動視頻流，避免暫停
-            setTimeout(() => {
-                restartVideoStream();
-            }, 1000); // 延遲1秒後重新啟動
+            sendButton.disabled = false; // 启用传送照片按钮
         }
 
         // 傳送圖片功能
-        function sendImage(dataURL) {
-            const base64Image = dataURL.split(',')[1];
-            //const data = { image: base64Image };
-			const data = {
-							"deviceType":"CloudPrinter",
-							"deviceId":{
-							"printerName":"E4050",
-							"workstation":null
-						},
-							"filePath":"/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
-							"fileRevision":"",
-							"labelName":"",
-							"quantity":"1",
-							"dataSources":
-							[
-							  {
-							  "PIC": base64Image      }
-							]
-						};
+        function sendImage() {
+            if (!capturedImage) {
+                alert('請先拍照');
+                return;
+            }
+
+            const base64Image = capturedImage.split(',')[1];
+            const data = {
+                "deviceType": "CloudPrinter",
+                "deviceId": {
+                    "printerName": "E4050",
+                    "workstation": null
+                },
+                "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
+                "fileRevision": "",
+                "labelName": "",
+                "quantity": "1",
+                "dataSources": [
+                    {
+                        "PIC": base64Image
+                    }
+                ]
+            };
 
             processModal.style.display = 'block';
 
             fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', { // 替換為你的API URL
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json',
-								   'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'						},
-                        body: JSON.stringify(data)
-                    })
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                },
+                body: JSON.stringify(data)
+            })
             .then(response => response.json())
             .then(data => {
                 processModal.style.display = 'none';
-                alert(`API回覆: ${data}`);
+                alert(`API回覆: ${JSON.stringify(data)}`);
             })
             .catch(error => {
                 processModal.style.display = 'none';
@@ -182,12 +182,11 @@
             });
         }
 
-        // 重新啟動視頻流
-        function restartVideoStream() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
+        // 離開功能
+        function exitPage() {
+            if (confirm("您確定要離開嗎？")) {
+                window.close();
             }
-            startVideoStream();
         }
     </script>
 </body>
