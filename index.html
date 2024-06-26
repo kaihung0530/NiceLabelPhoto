@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NiceLabel Cloud雲端列印</title>
+    <title>Loftware Cloud雲端列印</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,10 +12,17 @@
             padding: 0;
         }
         h1 {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background-color: #005EB8; /* Loftware藍 */
             color: white;
             padding: 1em;
             margin: 0;
+        }
+        h1 img {
+            height: 50px; /* 調整高度 */
+            margin-right: 10px;
         }
         #cameraContainer {
             margin: 20px 0;
@@ -73,19 +80,46 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        #videoStreamModal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            text-align: center;
+        }
+        #videoStreamModal video {
+            width: 80%;
+            max-width: 600px;
+            height: auto;
+            margin-top: 50px;
+        }
     </style>
 </head>
 <body>
-    <h1>NiceLabel Cloud雲端列印</h1>
+    <h2>
+        <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo"> <!-- 替換為你的Logo圖片URL -->
+        雲端列印
+    </h2>
     <div id="cameraContainer">
-        <video id="video" autoplay playsinline></video>
         <div>
-            <button id="snap" onclick="takeSnapshot()">拍照</button>
+            <button id="openCamera" onclick="openCamera()">開啟相機</button>
+            <button id="takePhoto" onclick="takePhoto()" disabled>拍照</button>
             <button id="send" onclick="sendImage()" disabled>列印照片</button>
             <button id="exit" onclick="exitPage()">離開</button>
         </div>
         <canvas id="canvas" style="display:none;"></canvas>
         <img id="preview" src="" alt="預覽圖片" style="display:none;">
+    </div>
+    <div id="videoStreamModal">
+        <video id="video" autoplay playsinline></video>
+        <div>
+            <button onclick="switchCamera()">切換鏡頭</button>
+            <button onclick="closeVideoStream()">關閉相機</button>
+        </div>
     </div>
     <div id="processModal">
         <div class="modal-content">
@@ -94,24 +128,41 @@
         </div>
     </div>
     <script>
+        let localStream;
+        let usingFrontCamera = false;
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const preview = document.getElementById('preview');
         const processModal = document.getElementById('processModal');
         const sendButton = document.getElementById('send');
-        let capturedImage = null;
-        let localStream;
+        const takePhotoButton = document.getElementById('takePhoto');
+        const videoStreamModal = document.getElementById('videoStreamModal');
 
-        // 獲取相機視頻流
-        function startVideoStream() {
-            navigator.mediaDevices.getUserMedia({
+        // 打開相機
+        function openCamera() {
+            startVideoStream(usingFrontCamera);
+        }
+
+        // 切換鏡頭
+        function switchCamera() {
+            usingFrontCamera = !usingFrontCamera;
+            stopVideoStream();
+            startVideoStream(usingFrontCamera);
+        }
+
+        // 開啟視頻流
+        function startVideoStream(front = false) {
+            const constraints = {
                 video: {
-                    facingMode: 'environment' // 使用後置攝像頭
+                    facingMode: front ? 'user' : 'environment' // 切換前後鏡頭
                 }
-            })
+            };
+            navigator.mediaDevices.getUserMedia(constraints)
             .then(stream => {
                 video.srcObject = stream;
                 localStream = stream;
+                videoStreamModal.style.display = 'block';
+                takePhotoButton.disabled = false; // 啟用拍照按鈕
             })
             .catch(error => {
                 alert('無法訪問相機: ' + error);
@@ -119,24 +170,32 @@
             });
         }
 
-        // 初始化视频流
-        startVideoStream();
+        // 關閉視頻流
+        function stopVideoStream() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            videoStreamModal.style.display = 'none';
+        }
 
         // 拍照功能
-        function takeSnapshot() {
+        function takePhoto() {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            capturedImage = canvas.toDataURL('image/png');
+            stopVideoStream();
+            const capturedImage = canvas.toDataURL('image/png');
             preview.src = capturedImage;
             preview.style.display = 'block';
-            sendButton.disabled = false; // 启用传送照片按钮
+            sendButton.disabled = false; // 啟用傳送照片按鈕
         }
 
         // 傳送圖片功能
         function sendImage() {
+            const capturedImage = preview.src;
             if (!capturedImage) {
                 alert('請先拍照');
                 return;
@@ -187,6 +246,11 @@
             if (confirm("您確定要離開嗎？")) {
                 window.close();
             }
+        }
+
+        // 關閉視頻流和模態框
+        function closeVideoStream() {
+            stopVideoStream();
         }
     </script>
 </body>
