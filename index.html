@@ -184,7 +184,11 @@
         // 離開功能
         function exitPage() {
             if (confirm("您確定要離開嗎？")) {
-                window.close();
+                if (window.opener) {
+                    window.close();
+                } else {
+                    alert("此功能無法在本頁面關閉。");
+                }
             }
         }
     </script>
