@@ -15,13 +15,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #005EB8; /* Loftware藍 */
+            background-color: #005EB8;
             color: white;
             padding: 1em;
             margin: 0;
         }
         h1 img {
-            height: 50px; /* 調整高度 */
+            height: 50px;
             margin-right: 10px;
         }
         #cameraContainer {
@@ -36,7 +36,7 @@
         button {
             padding: 15px 30px;
             font-size: 18px;
-            background-color: #005EB8; /* Loftware藍 */
+            background-color: #005EB8;
             color: white;
             border: none;
             border-radius: 5px;
@@ -44,7 +44,7 @@
             margin: 10px 5px;
         }
         button:hover {
-            background-color: #004a91; /* 深藍色，點擊效果 */
+            background-color: #004a91;
         }
         #processModal {
             display: none;
@@ -70,7 +70,7 @@
         #loader {
             border: 8px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 8px solid #005EB8; /* Loftware藍 */
+            border-top: 8px solid #005EB8;
             width: 50px;
             height: 50px;
             animation: spin 1s linear infinite;
@@ -83,10 +83,9 @@
     </style>
 </head>
 <body>
-
     <h2 style="font-size: 40px;">
-        <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo"> <!-- 替換為你的Logo圖片URL -->
-        雲端列印，在EPSON
+        <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
+        雲端列印，在EPSON測試
     </h2>
     <div id="cameraContainer">
         <video id="video" autoplay playsinline></video>
@@ -113,11 +112,10 @@
         let capturedImage = null;
         let localStream;
 
-        // 獲取相機視頻流
         function startVideoStream() {
             navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: 'environment' // 使用後置攝像頭
+                    facingMode: 'environment'
                 }
             })
             .then(stream => {
@@ -130,10 +128,8 @@
             });
         }
 
-        // 初始化视频流
         startVideoStream();
 
-        // 拍照功能
         function takeSnapshot() {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
@@ -143,10 +139,21 @@
             capturedImage = canvas.toDataURL('image/png');
             preview.src = capturedImage;
             preview.style.display = 'block';
-            sendButton.disabled = false; // 启用传送照片按钮
+            sendButton.disabled = false;
         }
 
-        // 傳送圖片功能
+        function releaseCamera() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function resetUI() {
+            preview.src = '';
+            preview.style.display = 'none';
+            sendButton.disabled = true;
+        }
+
         function sendImage() {
             if (!capturedImage) {
                 alert('請先拍照');
@@ -157,7 +164,7 @@
             const data = {
                 "deviceType": "CloudPrinter",
                 "deviceId": {
-                    "printerName": "E4050",
+                    "printerName": "1234",
                     "workstation": null
                 },
                 "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
@@ -173,7 +180,7 @@
 
             processModal.style.display = 'block';
 
-            fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', { // 替換為你的API URL
+            fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -185,15 +192,20 @@
             .then(data => {
                 processModal.style.display = 'none';
                 alert(`API回覆: ${JSON.stringify(data)}`);
+                releaseCamera();
+                resetUI();
+                startVideoStream();
             })
             .catch(error => {
                 processModal.style.display = 'none';
                 alert('API回覆時出錯');
                 console.error('Error:', error);
+                releaseCamera();
+                resetUI();
+                startVideoStream();
             });
         }
 
-        // 離開功能
         function exitPage() {
             if (confirm("您確定要離開嗎？")) {
                 window.close();
