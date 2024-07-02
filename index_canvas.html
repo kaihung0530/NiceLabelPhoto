@@ -91,7 +91,7 @@
         <video id="video" autoplay playsinline></video>
         <div>
             <button id="snap" onclick="takeSnapshot()">拍照</button>
-            <button id="send" onclick="sendImage()" disabled>傳送照片</button>
+            <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
             <button id="exit" onclick="exitPage()">離開</button>
         </div>
         <canvas id="canvas" style="display:none;"></canvas>
@@ -109,6 +109,26 @@
         const preview = document.getElementById('preview');
         const processModal = document.getElementById('processModal');
         const sendButton = document.getElementById('send');
+		
+		// GitHub repository info
+        const owner = 'kaihung0530';
+        const repo = 'NiceLabelPhoto';
+        const branch = 'main';
+        const path = 'images/'; // Directory in the repo where the image will be uploaded
+       
+        function getCurrentDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            return `${year}${month}${day}${hours}${minutes}${seconds}`;
+        }
+		const picpath='https://kaihung0530.github.io/NiceLabelPhoto/images/'
+		
         let capturedImage = null;
         let localStream;
 
@@ -154,11 +174,11 @@
             sendButton.disabled = true;
         }
 
-        function sendImage() {
-            if (!capturedImage) {
-                alert('請先拍照');
-                return;
-            }
+        function sendImage(photopath) {
+            <!-- if (!capturedImage) { -->
+                <!-- alert('請先拍照'); -->
+                <!-- return; -->
+            <!-- } -->
 
             const base64Image = capturedImage.split(',')[1];
             const data = {
@@ -173,7 +193,7 @@
                 "quantity": "1",
                 "dataSources": [
                     {
-                        "PIC": base64Image
+                        "PIC": photopath
                     }
                 ]
             };
@@ -195,6 +215,51 @@
                 releaseCamera();
                 resetUI();
                 startVideoStream();
+            })
+            .catch(error => {
+                processModal.style.display = 'none';
+                alert('API回覆時出錯');
+                console.error('Error:', error);
+                releaseCamera();
+                resetUI();
+                startVideoStream();
+            });
+        }
+		
+		function UploadImage() {
+            if (!capturedImage) {
+                alert('請先拍照');
+                return;
+            }
+			
+            const fileName = getCurrentDateTime()+".jpg";
+			const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
+			const base64Image = capturedImage.split(',')[1];
+			const data = {
+					"filePath": "/DelenTest/Base64PIC/Photo/test.png",
+					"content": base64Image,
+					"comment": "API creation",
+					"overwriteIfExists": true,
+					"generateFileDetails": true
+					};
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                processModal.style.display = 'none';
+				console.log(data);
+                //alert(`API回覆: ${JSON.stringify(data.content.download_url)}`);
+				sendImage("https://barwanddemo.onnicelabel.com:8080/DelenTest/Base64PIC/Photo/test.png");
+                //releaseCamera();
+                //resetUI();
+                //startVideoStream();
             })
             .catch(error => {
                 processModal.style.display = 'none';
