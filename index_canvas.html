@@ -158,7 +158,7 @@
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             // 壓縮圖片
-            const quality = 0.6; // 壓縮質量，0 到 1 之間，越低文件越小，質量也越低
+            const quality = 0.8; // 壓縮質量，0 到 1 之間，越低文件越小，質量也越低
             canvas.toBlob((blob) => {
                 if (blob.size > 100 * 1024) {
                     // 如果圖片大於 100KB，再次壓縮
@@ -261,7 +261,7 @@
 			const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
 			const base64Image = capturedImage.split(',')[1];
 			const data = {
-					"filePath": "/DelenTest/Base64PIC/Photo/test.png",
+					"filePath": "/DelenTest/Base64PIC/Graphics/test.png",
 					"content": base64Image,
 					"comment": "API creation",
 					"overwriteIfExists": true,
