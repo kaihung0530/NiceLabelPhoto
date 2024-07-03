@@ -251,7 +251,7 @@
         }
 		
 		function UploadImage() {
-			console.log(new Date());
+			//console.log(new Date());
             if (!capturedImage) {
                 alert('請先拍照');
                 return;
@@ -280,7 +280,7 @@
             .then(data => {
                 processModal.style.display = 'none';
 				console.log(data);
-				console.log(new Date());
+				//console.log(new Date());
                 //alert(`API回覆: ${JSON.stringify(data.content.download_url)}`);
 				sendImage("https://barwanddemo.onnicelabel.com:8080/DelenTest/Base64PIC/Photo/test.png");
                 //releaseCamera();
