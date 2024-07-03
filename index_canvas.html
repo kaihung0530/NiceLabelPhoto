@@ -150,16 +150,40 @@
 
         startVideoStream();
 
-        function takeSnapshot() {
+function takeSnapshot() {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            capturedImage = canvas.toDataURL('image/png');
-            preview.src = capturedImage;
-            preview.style.display = 'block';
-            sendButton.disabled = false;
+
+            // 壓縮圖片
+            const quality = 0.6; // 壓縮質量，0 到 1 之間，越低文件越小，質量也越低
+            canvas.toBlob((blob) => {
+                if (blob.size > 100 * 1024) {
+                    // 如果圖片大於 100KB，再次壓縮
+                    const scale = Math.sqrt(100 * 1024 / blob.size); // 根據文件大小縮放
+                    canvas.width *= scale;
+                    canvas.height *= scale;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob((resizedBlob) => {
+                        processBlob(resizedBlob);
+                    }, 'image/jpeg', quality);
+                } else {
+                    processBlob(blob);
+                }
+            }, 'image/jpeg', quality);
+
+            function processBlob(blob) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    capturedImage = reader.result;
+                    preview.src = capturedImage;
+                    preview.style.display = 'block';
+                    sendButton.disabled = false;
+                };
+                reader.readAsDataURL(blob);
+            }
         }
 
         function releaseCamera() {
@@ -227,6 +251,7 @@
         }
 		
 		function UploadImage() {
+			console.log(new Date());
             if (!capturedImage) {
                 alert('請先拍照');
                 return;
@@ -255,8 +280,9 @@
             .then(data => {
                 processModal.style.display = 'none';
 				console.log(data);
+				console.log(new Date());
                 //alert(`API回覆: ${JSON.stringify(data.content.download_url)}`);
-				sendImage("https://barwanddemo.onnicelabel.com:8080/DelenTest/Base64PIC/Photo/test.png");
+				//sendImage("https://barwanddemo.onnicelabel.com:8080/DelenTest/Base64PIC/Photo/test.png");
                 //releaseCamera();
                 //resetUI();
                 //startVideoStream();
