@@ -121,7 +121,7 @@
             return `${year}${month}${day}${hours}${minutes}${seconds}`;
         }
 
-        async function compressImageToTargetSize(img, targetSizeKB = 200, maxAttempts = 200) {
+        async function compressImageToTargetSize(img, targetSizeKB = 10, maxAttempts = 10) {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             let quality = 0.9;
@@ -157,7 +157,7 @@
             reader.onload = async function(e) {
                 const img = new Image();
                 img.onload = async function() {
-                    const compressed = await compressImageToTargetSize(img, 10);
+                    const compressed = await compressImageToTargetSize(img, 200);
                     capturedImage = compressed;
                     preview.src = compressed;
                     preview.style.display = 'block';
