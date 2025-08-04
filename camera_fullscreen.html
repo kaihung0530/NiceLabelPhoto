@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>全螢幕相機</title>
-  <!-- 引入 Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
     html, body {
       margin: 0;
@@ -13,12 +12,29 @@
       background: black;
       height: 100%;
       overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #cameraContainer, #resultContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
     }
 
     #cameraContainer {
-      position: relative;
-      width: 100%;
-      height: 100%;
+      display: block;
+    }
+
+    #resultContainer {
+      display: none;
+      background: black;
+      color: white;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
     }
 
     video, canvas, #overlayImage {
@@ -50,7 +66,6 @@
       font-size: 18px;
     }
 
-    /* --------- 切換鏡頭：圓形按鈕 --------- */
     #switchButton {
       left: 10px;
       width: 50px;
@@ -64,33 +79,68 @@
     }
 
     #switchButton i {
-      font-size: 24px;
+      font-size: 40px;
       color: white;
     }
 
-    /* --------- 拍照：圓形快門按鈕 --------- */
     #captureButton {
       left: 50%;
       transform: translateX(-50%);
       width: 65px;
       height: 65px;
       border-radius: 50%;
-      background-color: white;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     #captureButton i {
-      color: black;
-      font-size: 30px;
+      color: white;
+      font-size: 50px;
     }
 
-    /* --------- 重啟串流 --------- */
     #restartButton {
       right: 10px;
       padding: 10px 20px;
       border-radius: 5px;
+    }
+
+    #photoPreview {
+      max-width: 90%;
+      max-height: 70%;
+      margin-bottom: 20px;
+    }
+
+    .result-button {
+      padding: 12px 24px;
+      margin: 10px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: none;
+      background-color: #005EB8;
+      color: white;
+    }
+
+    /* ✅ 列印樣式：只顯示圖片 */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      #photoPreview {
+        visibility: visible;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      .result-button {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -99,13 +149,16 @@
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
     <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
-    <button class="camera-button" id="captureButton">
-      <i class="fas fa-circle"></i>
-    </button>
-    <button class="camera-button" id="switchButton">
-      <i class="fas fa-camera-rotate"></i>
-    </button>
+    <button class="camera-button" id="captureButton"><i class="fas fa-camera"></i></button>
+    <button class="camera-button" id="switchButton"><i class="fas fa-camera-rotate"></i></button>
     <button class="camera-button" id="restartButton">重啟串流</button>
+  </div>
+
+  <!-- 拍照結果畫面 -->
+  <div id="resultContainer">
+    <img id="photoPreview" src="" alt="拍照結果" />
+    <button class="result-button" onclick="window.print()">列印</button>
+    <button class="result-button" onclick="retakePhoto()">重新拍照</button>
   </div>
 
   <script>
@@ -116,6 +169,10 @@
     const switchButton = document.getElementById('switchButton');
     const restartButton = document.getElementById('restartButton');
     const captureButton = document.getElementById('captureButton');
+
+    const cameraContainer = document.getElementById('cameraContainer');
+    const resultContainer = document.getElementById('resultContainer');
+    const photoPreview = document.getElementById('photoPreview');
 
     let currentFacing = new URLSearchParams(location.search).get('facing') || 'user';
     let currentStream = null;
@@ -136,6 +193,9 @@
         currentFacing = facingMode;
 
         canvas.style.display = 'none';
+        cameraContainer.style.display = 'block';
+        resultContainer.style.display = 'none';
+
         console.log(`已啟用鏡頭：${facingMode}`);
       } catch (err) {
         alert("無法啟用相機：" + err.message);
@@ -154,10 +214,19 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
 
-      canvas.style.display = 'block';
       const dataUrl = canvas.toDataURL("image/jpeg");
-      console.log("拍照完成", dataUrl);
+      photoPreview.src = dataUrl;
+
+      cameraContainer.style.display = 'none';
+      resultContainer.style.display = 'flex';
+
+      console.log("拍照完成");
     });
+
+    // 重新拍照
+    function retakePhoto() {
+      startCamera(currentFacing);
+    }
 
     // 切換鏡頭
     switchButton.addEventListener('click', () => {
