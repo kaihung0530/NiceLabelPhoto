@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全螢幕相機</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: black;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #cameraContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #captureButton {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            padding: 10px 20px;
+            background-color: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="cameraContainer">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
+        <button id="captureButton">拍照</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const facing = new URLSearchParams(location.search).get('facing') || 'user';
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                alert("無法啟用相機：" + err.message);
+            });
+
+        document.getElementById('captureButton').addEventListener('click', () => {
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 預覽（或可儲存 / 傳送）
+            const dataUrl = canvas.toDataURL("image/jpeg");
+            console.log("拍照完成", dataUrl);
+            alert("已拍照！");
+        });
+    </script>
+</body>
+</html>

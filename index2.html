@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loftware Cloud 雲端列印</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        h2 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            color: #005EB8;
+            padding: 1em;
+            margin: 0;
+            font-size: 40px;
+        }
+
+        h2 img {
+            height: 50px;
+            margin-right: 10px;
+        }
+
+        #cameraChoiceModal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #cameraChoiceModal .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #005EB8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background-color: #004a91;
+        }
+    </style>
+</head>
+<body>
+    <h2 id="titleText">
+        <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
+        雲端列印，在EPSON8050
+    </h2>
+
+    <div id="cameraChoiceModal">
+        <div class="modal-content">
+            <p>請選擇要使用的鏡頭：</p>
+            <button onclick="startCameraInNewTab('user')">前鏡頭</button>
+            <button onclick="startCameraInNewTab('environment')">後鏡頭</button>
+        </div>
+    </div>
+
+    <script>
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const printerParam = getQueryParam("PrinterName") || "E8050";
+            const printerName = printerParam.replace(/^E/, "EPSON");
+            document.getElementById("titleText").innerHTML = `
+                <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
+                雲端列印，在 ${printerName}
+            `;
+        });
+
+        function startCameraInNewTab(facingMode) {
+            const url = `camera_fullscreen.html?facing=${facingMode}`;
+            window.open(url, "_blank");
+        }
+    </script>
+</body>
+</html>
