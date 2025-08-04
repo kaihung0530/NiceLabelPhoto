@@ -1,115 +1,133 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全螢幕相機</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            background: black;
-            height: 100%;
-            overflow: hidden;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>全螢幕相機</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      height: 100%;
+      overflow: hidden;
+    }
 
-        #cameraContainer {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
+    #cameraContainer {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
 
-        video, canvas, #overlayImage {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: fill;
-        }
+    video, canvas, #overlayImage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+    }
 
-        #overlayImage {
-            z-index: 5;
-            pointer-events: none;
-        }
+    #overlayImage {
+      z-index: 5;
+      pointer-events: none;
+    }
 
-        .camera-button {
-            position: absolute;
-            bottom: 20px;
-            z-index: 10;
-            padding: 10px 20px;
-            background-color: rgba(0,0,0,0.6);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 18px;
-        }
+    .camera-button {
+      position: absolute;
+      bottom: 20px;
+      z-index: 10;
+      padding: 10px 20px;
+      background-color: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 18px;
+    }
 
-        #captureButton {
-            left: 50%;
-            transform: translateX(-50%);
-        }
+    #captureButton {
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
-        #switchButton {
-            right: 10px;
-        }
-    </style>
+    #switchButton {
+      left: 10px;
+    }
+
+    #restartButton {
+      right: 10px;
+    }
+  </style>
 </head>
 <body>
-    <div id="cameraContainer">
-        <video id="video" autoplay muted playsinline></video>
-        <canvas id="canvas"></canvas>
-        <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
-        <button class="camera-button" id="captureButton">拍照</button>
-        <button class="camera-button" id="switchButton">切換鏡頭</button>
-    </div>
+  <div id="cameraContainer">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
+    <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
+    <button class="camera-button" id="captureButton">拍照</button>
+    <button class="camera-button" id="switchButton">切換鏡頭</button>
+    <button class="camera-button" id="restartButton">重啟串流</button>
+  </div>
 
-    <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const overlay = document.getElementById('overlayImage');
-        const switchButton = document.getElementById('switchButton');
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const overlay = document.getElementById('overlayImage');
 
-        let currentFacing = new URLSearchParams(location.search).get('facing') || 'user';
-        let currentStream = null;
+    const switchButton = document.getElementById('switchButton');
+    const restartButton = document.getElementById('restartButton');
+    const captureButton = document.getElementById('captureButton');
 
-        async function startCamera(facingMode) {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
+    let currentFacing = new URLSearchParams(location.search).get('facing') || 'user';
+    let currentStream = null;
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
-                video.srcObject = stream;
-                currentStream = stream;
-                currentFacing = facingMode;
-            } catch (err) {
-                alert("無法啟用相機：" + err.message);
-            }
+    async function startCamera(facingMode) {
+      try {
+        // 停止舊的 stream（若有）
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
         }
 
-        // 初始啟動相機
-        startCamera(currentFacing);
-
-        // 拍照
-        document.getElementById('captureButton').addEventListener('click', () => {
-            const ctx = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
-
-            const dataUrl = canvas.toDataURL("image/jpeg");
-            console.log("拍照完成", dataUrl);
-            alert("已拍照！");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode }
         });
 
-        // 切換鏡頭
-        switchButton.addEventListener('click', () => {
-            const newFacing = currentFacing === 'user' ? 'environment' : 'user';
-            startCamera(newFacing);
-        });
-    </script>
+        video.srcObject = stream;
+        currentStream = stream;
+        currentFacing = facingMode;
+        console.log(`已啟用鏡頭：${facingMode}`);
+      } catch (err) {
+        alert("無法啟用相機：" + err.message);
+      }
+    }
+
+    // 初始化相機
+    startCamera(currentFacing);
+
+    // 拍照
+    captureButton.addEventListener('click', () => {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+
+      const dataUrl = canvas.toDataURL("image/jpeg");
+      console.log("拍照完成", dataUrl);
+      alert("已拍照！");
+    });
+
+    // 切換鏡頭
+    switchButton.addEventListener('click', () => {
+      const newFacing = currentFacing === 'user' ? 'environment' : 'user';
+      startCamera(newFacing);
+    });
+
+    // 重啟串流
+    restartButton.addEventListener('click', () => {
+      startCamera(currentFacing);
+    });
+  </script>
 </body>
 </html>
