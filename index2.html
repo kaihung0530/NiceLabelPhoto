@@ -86,6 +86,7 @@
 	</div>
 
     <script>
+		let globalPrinterName = "";
 		function showCameraChoice() {
 			document.getElementById("cameraChoiceModal").style.display = "block";
 		}
@@ -100,6 +101,7 @@
 
         document.addEventListener("DOMContentLoaded", function () {
             const printerParam = getQueryParam("PrinterName") || "E8050";
+			globalPrinterName = printerParam;
             const printerName = printerParam.replace(/^E/, "EPSON");
             document.getElementById("titleText").innerHTML = `
                 <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
@@ -108,7 +110,7 @@
         });
 
         function startCameraInNewTab(facingMode) {
-            const url = `camera_fullscreen.html?facing=${facingMode}`;
+            const url = `camera_fullscreen.html?facing=${facingMode}&PrinterName=${globalPrinterName}`;
             window.open(url, "_blank");
         }
     </script>
