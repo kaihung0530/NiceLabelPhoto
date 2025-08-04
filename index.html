@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- 網址輸入: https://kaihung0530.github.io/NiceLabelPhoto/index.html?PrinterName=E6550 -->
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -20,6 +19,7 @@
             color: white;
             padding: 1em;
             margin: 0;
+            font-size: 40px;
         }
         h2 img {
             height: 50px;
@@ -27,23 +27,6 @@
         }
         #cameraContainer {
             margin: 20px 0;
-        }
-        #canvasContainer {
-            position: relative;
-            display: inline-block;
-        }
-        #backgroundImage, #previewCanvas {
-            width: 100%;
-            max-width: 300px;
-            display: block;
-        }
-        #videoElement {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            max-width: 300px;
-            opacity: 0.7;
         }
         button {
             padding: 15px 30px;
@@ -57,6 +40,27 @@
         }
         button:hover {
             background-color: #004a91;
+        }
+        #overlayContainer {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            margin: 20px auto;
+            aspect-ratio: 3/4;
+        }
+        #overlayImage, #video, #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        #preview {
+            width: 100%;
+            max-width: 300px;
+            display: none;
+            margin: 20px auto;
         }
         #processModal {
             display: none;
@@ -99,21 +103,19 @@
         <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
         雲端列印，在EPSON8050
     </h2>
-
     <div id="cameraContainer">
-        <div id="canvasContainer">
-            <img id="backgroundImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back view.png" alt="Overlay">
-            <video id="videoElement" autoplay playsinline></video>
-            <canvas id="previewCanvas" style="display:none;"></canvas>
-        </div>
-
         <div>
-            <button onclick="capturePhoto()">拍照</button>
+            <button id="takePhoto" onclick="capturePhoto()">拍照</button>
             <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
-            <button onclick="exitPage()">離開</button>
+            <button id="exit" onclick="exitPage()">離開</button>
         </div>
+        <div id="overlayContainer">
+            <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back view.png" alt="Overlay">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+        <img id="preview" src="" alt="預覽圖片">
     </div>
-
     <div id="processModal">
         <div class="modal-content">
             <div id="loader"></div>
@@ -122,20 +124,19 @@
     </div>
 
     <script>
-        const video = document.getElementById('videoElement');
-        const canvas = document.getElementById('previewCanvas');
-        const context = canvas.getContext('2d');
-        const background = document.getElementById('backgroundImage');
-        const processModal = document.getElementById('processModal');
-        const sendButton = document.getElementById('send');
-        let capturedImage = "";
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const preview = document.getElementById("preview");
+        const processModal = document.getElementById("processModal");
+        const sendButton = document.getElementById("send");
+        let capturedImage = null;
 
-        // 顯示列印機名稱
         function getQueryParam(param) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(param);
         }
-        document.addEventListener("DOMContentLoaded", function () {
+
+        document.addEventListener("DOMContentLoaded", () => {
             const printerParam = getQueryParam("PrinterName") || "E8050";
             const printerName = printerParam.replace(/^E/, "EPSON");
             document.getElementById("titleText").innerHTML = `
@@ -145,122 +146,107 @@
             startCamera();
         });
 
-        // 啟動相機
-        function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(error => {
-                    alert("無法啟動相機：" + error.message);
-                });
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("無法開啟相機：" + err.message);
+            }
         }
 
         function capturePhoto() {
-            canvas.width = background.naturalWidth;
-            canvas.height = background.naturalHeight;
+            const overlayImg = document.getElementById("overlayImage");
+            canvas.width = overlayImg.naturalWidth || overlayImg.width;
+            canvas.height = overlayImg.naturalHeight || overlayImg.height;
+            const context = canvas.getContext("2d");
 
-            context.drawImage(background, 0, 0, canvas.width, canvas.height);
+            context.drawImage(overlayImg, 0, 0, canvas.width, canvas.height);
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            canvas.style.display = 'block';
-
-            capturedImage = canvas.toDataURL("image/jpeg", 0.9);
+            const base64 = canvas.toDataURL("image/jpeg", 0.9);
+            preview.src = base64;
+            preview.style.display = "block";
+            capturedImage = base64;
             sendButton.disabled = false;
         }
 
         function getCurrentDateTime() {
             const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-            const h = String(now.getHours()).padStart(2, '0');
-            const min = String(now.getMinutes()).padStart(2, '0');
-            const s = String(now.getSeconds()).padStart(2, '0');
-            return `${y}${m}${d}${h}${min}${s}`;
+            return `${now.getFullYear()}${String(now.getMonth()+1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
         }
 
-        function UploadImage() {
-            if (!capturedImage) {
-                alert('請先拍照');
-                return;
-            }
-
-            const printerName = getQueryParam("PrinterName") || "E8050";
-            const fileName = getCurrentDateTime() + ".jpg";
-            const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
-            const base64Image = capturedImage.split(',')[1];
-
-            const data = {
-                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
-                "content": base64Image,
-                "comment": "API creation",
-                "overwriteIfExists": true,
-                "generateFileDetails": true
-            };
-
-            processModal.style.display = 'block';
-
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                processModal.style.display = 'none';
-                sendImage("");
-            })
-            .catch(error => {
-                processModal.style.display = 'none';
-                alert('API回覆時出錯');
-                console.error('Error:', error);
-            });
-        }
-
-        function sendImage(photopath) {
+        function sendImage() {
             const printerName = getQueryParam("PrinterName") || "E8050";
             const base64Image = capturedImage.split(',')[1];
             const data = {
-                "deviceType": "CloudPrinter",
-                "deviceId": {
-                    "printerName": printerName,
-                    "workstation": null
-                },
-                "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
-                "fileRevision": "",
-                "labelName": "",
-                "quantity": "1",
-                "dataSources": [
-                    {
-                        "PIC": photopath,
-                        "FileName": printerName + ".png"
-                    }
+                deviceType: "CloudPrinter",
+                deviceId: { printerName: printerName, workstation: null },
+                filePath: "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
+                fileRevision: "",
+                labelName: "",
+                quantity: "1",
+                dataSources: [
+                    { PIC: "", FileName: printerName + ".png" }
                 ]
             };
 
             processModal.style.display = 'block';
-
-            fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', {
-                method: 'POST',
+            fetch("https://labelcloudapi.onnicelabel.com/Print/v2/Print", {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                    "Content-Type": "application/json",
+                    "Ocp-Apim-Subscription-Key": "51808763a19243ca8694dc2f72cf7408"
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            .then(res => res.json())
+            .then(res => {
+                processModal.style.display = 'none';
+                alert("API回覆: " + JSON.stringify(res));
+            })
+            .catch(err => {
+                processModal.style.display = 'none';
+                alert("API回覆錯誤");
+                console.error(err);
+            });
+        }
+
+        function UploadImage() {
+            if (!capturedImage) {
+                alert("請先拍照");
+                return;
+            }
+
+            const printerName = getQueryParam("PrinterName") || "E8050";
+            const base64Image = capturedImage.split(',')[1];
+            const data = {
+                filePath: `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
+                content: base64Image,
+                comment: "API creation",
+                overwriteIfExists: true,
+                generateFileDetails: true
+            };
+
+            processModal.style.display = 'block';
+            fetch("https://labelcloudapi.onnicelabel.com/document/v2/files", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Ocp-Apim-Subscription-Key": "51808763a19243ca8694dc2f72cf7408"
+                },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
             .then(data => {
                 processModal.style.display = 'none';
-                alert(`API回覆: ${JSON.stringify(data)}`);
+                console.log(data);
+                //sendImage();
             })
-            .catch(error => {
+            .catch(err => {
                 processModal.style.display = 'none';
-                alert('API回覆時出錯');
-                console.error('Error:', error);
+                alert("圖片上傳錯誤");
+                console.error(err);
             });
         }
 
@@ -269,7 +255,7 @@
                 if (window.opener) {
                     window.close();
                 } else {
-                    alert("此功能無法在本頁面關閉。");
+                    alert("無法自動關閉本頁面");
                 }
             }
         }
