@@ -120,6 +120,28 @@
             animation: spin 1s linear infinite;
             margin: 0 auto;
         }
+		
+		#cameraChoiceModal {
+			display: none;
+			position: fixed;
+			z-index: 1000;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0,0,0,0.6);
+			text-align: center;
+		}
+
+		#cameraChoiceModal .modal-content {
+			position: relative;
+			top: 50%;
+			transform: translateY(-50%);
+			background-color: white;
+			padding: 20px;
+			border-radius: 10px;
+			display: inline-block;
+		}
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -132,7 +154,13 @@
         <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
         雲端列印，在EPSON8050
     </h2>
-
+	<div id="cameraChoiceModal">
+		<div class="modal-content">
+			<p>請選擇要使用的鏡頭：</p>
+			<button onclick="startCamera('user'); closeCameraChoice()">前鏡頭</button>
+			<button onclick="startCamera('environment'); closeCameraChoice()">後鏡頭</button>
+		</div>
+	</div>
     <div id="cameraContainer">
         <div id="cameraOverlayContainer">
             <video id="videoPreview" autoplay muted playsinline></video>
@@ -141,11 +169,7 @@
         </div>
 
         <div>
-			<select id="cameraSelector">
-				<option value="user">前鏡頭</option>
-				<option value="environment">後鏡頭</option>
-			</select>
-			<button onclick="promptCameraChoice()">開啟相機</button>
+			<button onclick="showCameraChoice()">開啟相機</button>
             <button onclick="captureFromVideo()">擷取畫面</button>
             <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
             <button onclick="exitPage()">離開</button>
@@ -166,6 +190,14 @@
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(param);
         }
+		
+		function showCameraChoice() {
+			document.getElementById("cameraChoiceModal").style.display = "block";
+		}
+
+		function closeCameraChoice() {
+			document.getElementById("cameraChoiceModal").style.display = "none";
+		}
 
         document.addEventListener("DOMContentLoaded", function () {
             const printerParam = getQueryParam("PrinterName") || "E8050";
