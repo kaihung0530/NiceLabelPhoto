@@ -140,6 +140,10 @@
   </style>
 </head>
 <body>
+	<div id="processModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+	background:rgba(0,0,0,0.6); color:white; font-size:24px; display:flex; align-items:center; justify-content:center; z-index:999;">
+	  處理中，請稍候...
+	</div>
   <div id="cameraContainer">
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
@@ -151,7 +155,7 @@
   <!-- 拍照結果畫面 -->
   <div id="resultContainer">
     <img id="photoPreview" src="" alt="拍照結果" />
-    <button class="result-button" onclick="window.print()">列印</button>
+    <button class="result-button" onclick="UploadImage()">列印</button>
     <button class="result-button" onclick="retakePhoto()">重新拍照</button>
   </div>
 
@@ -169,6 +173,7 @@
 
     let currentFacing = new URLSearchParams(location.search).get('facing') || 'user';
     let currentStream = null;
+	let capturedImage = ""; // 儲存拍照結果 base64
 
     async function startCamera(facingMode) {
       try {
@@ -209,6 +214,7 @@
 
       const dataUrl = canvas.toDataURL("image/jpeg");
       photoPreview.src = dataUrl;
+	  capturedImage = dataUrl; // 拍照後記錄 base64 給 UploadImage 使用
 
       cameraContainer.style.display = 'none';
       resultContainer.style.display = 'flex';
@@ -226,6 +232,88 @@
       const newFacing = currentFacing === 'user' ? 'environment' : 'user';
       startCamera(newFacing);
     });
+        function UploadImage() {
+            if (!capturedImage) {
+                alert('請先拍照');
+                return;
+            }
+
+            const printerName = getQueryParam("PrinterName") || "E8050";
+            const fileName = getCurrentDateTime() + ".jpg";
+            const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
+            const base64Image = capturedImage.split(',')[1];
+            const data = {
+                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
+                "content": base64Image,
+                "comment": "API creation",
+                "overwriteIfExists": true,
+                "generateFileDetails": true
+            };
+
+            processModal.style.display = 'block';
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                processModal.style.display = 'none';
+                console.log(data);
+                sendImage("");
+            })
+            .catch(error => {
+                processModal.style.display = 'none';
+                alert('API回覆時出錯');
+                console.error('Error:', error);
+            });
+        }
+        function sendImage(photopath) {
+            const printerName = getQueryParam("PrinterName") || "E8050";
+            const base64Image = capturedImage.split(',')[1];
+            const data = {
+                "deviceType": "CloudPrinter",
+                "deviceId": {
+                    "printerName": printerName,
+                    "workstation": null
+                },
+                "filePath": "/DelenTest/Base64PIC/Labels/BASE64PIC.nlbl",
+                "fileRevision": "",
+                "labelName": "",
+                "quantity": "1",
+                "dataSources": [
+                    {
+                        "PIC": photopath,
+                        "FileName": printerName + ".png"
+                    }
+                ]
+            };
+
+            processModal.style.display = 'block';
+
+            fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                processModal.style.display = 'none';
+                alert(`API回覆: ${JSON.stringify(data)}`);
+            })
+            .catch(error => {
+                processModal.style.display = 'none';
+                alert('API回覆時出錯');
+                console.error('Error:', error);
+            });
+        }
 
   </script>
 </body>
