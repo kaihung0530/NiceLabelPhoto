@@ -137,28 +137,28 @@
         display: none;
       }
     }
-        #processModal {
-            display: none;
-            position: fixed;
-            z-index: 999;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            text-align: center;
-        }
+	#processModal {
+		display: none;
+		position: fixed;
+		z-index: 999;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		background-color: rgba(0, 0, 0, 0.5);
+		text-align: center;
+	}
 
-        #processModal .modal-content {
-            position: relative;
-            top: 50%;
-            transform: translateY(-50%);
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            display: inline-block;
-            text-align: center;
-        }
+	#processModal .modal-content {
+		position: relative;
+		top: 50%;
+		transform: translateY(-50%);
+		background-color: white;
+		padding: 20px;
+		border-radius: 10px;
+		display: inline-block;
+		text-align: center;
+	}
   </style>
 </head>
 <body>
@@ -177,12 +177,12 @@
     <button class="result-button" onclick="UploadImage()">列印</button>
     <button class="result-button" onclick="retakePhoto()">重新拍照</button>
   </div>
-    <div id="processModal">
-        <div class="modal-content">
-            <div id="loader"></div>
-            <p>正在處理中，請稍後...</p>
-        </div>
-    </div>
+	<div id="processModal">
+		<div class="modal-content">
+			<div id="loader"></div>
+			<p>正在處理中，請稍後...</p>
+		</div>
+	</div>
   <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
@@ -258,46 +258,47 @@
       const newFacing = currentFacing === 'user' ? 'environment' : 'user';
       startCamera(newFacing);
     });
-        function UploadImage() {
-            if (!capturedImage) {
-                alert('請先拍照');
-                return;
-            }
+	function UploadImage() 
+	{
+		if (!capturedImage) {
+		alert('請先拍照');
+		return;
+	}
 
-            const printerName = getQueryParam("PrinterName") || "E8050";
-            const fileName = getCurrentDateTime() + ".jpg";
-            const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
-            const base64Image = capturedImage.split(',')[1];
-            const data = {
-                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
-                "content": base64Image,
-                "comment": "API creation",
-                "overwriteIfExists": true,
-                "generateFileDetails": true
-            };
+	const printerName = getQueryParam("PrinterName") || "E8050";
+	const fileName = getCurrentDateTime() + ".jpg";
+	const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
+	const base64Image = capturedImage.split(',')[1];
+	const data = {
+		"filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
+		"content": base64Image,
+		"comment": "API creation",
+		"overwriteIfExists": true,
+		"generateFileDetails": true
+	};
 
-            processModal.style.display = 'block';
+	processModal.style.display = 'block';
 
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                processModal.style.display = 'none';
-                console.log(data);
-                //sendImage("");
-            })
-            .catch(error => {
-                processModal.style.display = 'none';
-                alert('API回覆時出錯');
-                console.error('Error:', error);
-            });
-        }
+	fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+		},
+		body: JSON.stringify(data)
+	})
+	.then(response => response.json())
+	.then(data => {
+		processModal.style.display = 'none';
+		console.log(data);
+		sendImage("");
+	})
+	.catch(error => {
+		processModal.style.display = 'none';
+		alert('API回覆時出錯');
+		console.error('Error:', error);
+	});
+}
         function sendImage(photopath) {
             const printerName = getQueryParam("PrinterName") || "E8050";
             const base64Image = capturedImage.split(',')[1];
@@ -341,9 +342,9 @@
             });
         }
 		function getQueryParam(name) {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get(name);
-}
+		  const urlParams = new URLSearchParams(window.location.search);
+		  return urlParams.get(name);
+		}
 
         function getCurrentDateTime() {
             const now = new Date();
