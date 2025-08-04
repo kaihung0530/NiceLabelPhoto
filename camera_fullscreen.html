@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>全螢幕相機</title>
+  <!-- 引入 Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     html, body {
       margin: 0;
@@ -29,7 +31,7 @@
     }
 
     #canvas {
-      display: none; /* 預設隱藏畫布 */
+      display: none;
       z-index: 6;
     }
 
@@ -42,25 +44,53 @@
       position: absolute;
       bottom: 20px;
       z-index: 10;
-      padding: 10px 20px;
+      border: none;
       background-color: rgba(0,0,0,0.6);
       color: white;
-      border: none;
-      border-radius: 5px;
       font-size: 18px;
     }
 
+    /* --------- 切換鏡頭：圓形按鈕 --------- */
+    #switchButton {
+      left: 10px;
+      width: 50px;
+      height: 50px;
+      padding: 0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    #switchButton i {
+      font-size: 24px;
+      color: white;
+    }
+
+    /* --------- 拍照：圓形快門按鈕 --------- */
     #captureButton {
       left: 50%;
       transform: translateX(-50%);
+      width: 65px;
+      height: 65px;
+      border-radius: 50%;
+      background-color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    #switchButton {
-      left: 10px;
+    #captureButton i {
+      color: black;
+      font-size: 30px;
     }
 
+    /* --------- 重啟串流 --------- */
     #restartButton {
       right: 10px;
+      padding: 10px 20px;
+      border-radius: 5px;
     }
   </style>
 </head>
@@ -69,8 +99,12 @@
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
     <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
-    <button class="camera-button" id="captureButton">拍照</button>
-    <button class="camera-button" id="switchButton">切換鏡頭</button>
+    <button class="camera-button" id="captureButton">
+      <i class="fas fa-circle"></i>
+    </button>
+    <button class="camera-button" id="switchButton">
+      <i class="fas fa-camera-rotate"></i>
+    </button>
     <button class="camera-button" id="restartButton">重啟串流</button>
   </div>
 
@@ -101,7 +135,7 @@
         currentStream = stream;
         currentFacing = facingMode;
 
-        canvas.style.display = 'none'; // 每次啟動相機時隱藏 canvas
+        canvas.style.display = 'none';
         console.log(`已啟用鏡頭：${facingMode}`);
       } catch (err) {
         alert("無法啟用相機：" + err.message);
@@ -120,7 +154,7 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
 
-      canvas.style.display = 'block'; // 顯示畫布結果
+      canvas.style.display = 'block';
       const dataUrl = canvas.toDataURL("image/jpeg");
       console.log("拍照完成", dataUrl);
     });
