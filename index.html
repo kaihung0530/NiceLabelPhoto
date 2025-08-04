@@ -11,6 +11,7 @@
             margin: 0;
             padding: 0;
         }
+
         h2 {
             display: flex;
             align-items: center;
@@ -21,26 +22,38 @@
             margin: 0;
             font-size: 40px;
         }
+
         h2 img {
             height: 50px;
             margin-right: 10px;
+        }
+
+        #cameraContainer {
+            margin-top: 20px;
         }
 
         #cameraOverlayContainer {
             position: relative;
             width: 100%;
             max-width: 300px;
-            margin: 20px auto;
+            margin: 0 auto;
+            aspect-ratio: 3 / 4;
+            background: black;
+            overflow: hidden;
         }
 
-        #cameraOverlayContainer img,
-        #cameraOverlayContainer video {
+        #cameraOverlayContainer video,
+        #cameraOverlayContainer img {
             position: absolute;
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: contain;
             top: 0;
             left: 0;
-            object-fit: contain;
+        }
+
+        #cameraOverlayContainer video {
+            z-index: 1;
         }
 
         #cameraOverlayContainer img {
@@ -48,8 +61,8 @@
             pointer-events: none;
         }
 
-        #cameraOverlayContainer video {
-            z-index: 1;
+        #cameraControls {
+            margin-top: 20px;
         }
 
         #preview {
@@ -122,14 +135,16 @@
     <div id="cameraContainer">
         <div id="cameraOverlayContainer">
             <video id="videoPreview" autoplay playsinline></video>
-            <!-- 請確保這張圖路徑正確：可換成 GitHub 連結或上傳圖片 -->
+            <!-- ❗️請將下方 src 改為你的圖片網址或正確相對路徑 -->
             <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back view.png" alt="Overlay" />
         </div>
-        <div>
+
+        <div id="cameraControls">
             <button onclick="captureFromVideo()">拍照</button>
             <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
             <button onclick="exitPage()">離開</button>
         </div>
+
         <canvas id="canvas" style="display:none;"></canvas>
         <img id="preview" src="" alt="預覽圖片">
     </div>
@@ -278,7 +293,6 @@
 
         function sendImage() {
             const printerName = getQueryParam("PrinterName") || "E8050";
-            const base64Image = capturedImage.split(',')[1];
             const data = {
                 "deviceType": "CloudPrinter",
                 "deviceId": {
