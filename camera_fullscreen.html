@@ -99,11 +99,6 @@
       font-size: 50px;
     }
 
-    #restartButton {
-      right: 10px;
-      padding: 10px 20px;
-      border-radius: 5px;
-    }
 
     #photoPreview {
       max-width: 90%;
@@ -149,9 +144,8 @@
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
     <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
-    <button class="camera-button" id="captureButton"><i class="fas fa-camera"></i></button>
     <button class="camera-button" id="switchButton"><i class="fas fa-camera-rotate"></i></button>
-    <button class="camera-button" id="restartButton">重啟串流</button>
+	<button class="camera-button" id="captureButton"><i class="fas fa-camera"></i></button>
   </div>
 
   <!-- 拍照結果畫面 -->
@@ -167,7 +161,6 @@
     const overlay = document.getElementById('overlayImage');
 
     const switchButton = document.getElementById('switchButton');
-    const restartButton = document.getElementById('restartButton');
     const captureButton = document.getElementById('captureButton');
 
     const cameraContainer = document.getElementById('cameraContainer');
@@ -234,10 +227,6 @@
       startCamera(newFacing);
     });
 
-    // 重啟串流
-    restartButton.addEventListener('click', () => {
-      startCamera(currentFacing);
-    });
   </script>
 </body>
 </html>
