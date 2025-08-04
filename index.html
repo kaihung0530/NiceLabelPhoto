@@ -12,7 +12,7 @@
             padding: 0;
         }
 
-        h2 {
+        h1, h2 {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -20,16 +20,15 @@
             color: white;
             padding: 1em;
             margin: 0;
-            font-size: 40px;
         }
 
-        h2 img {
+        h1 img, h2 img {
             height: 50px;
             margin-right: 10px;
         }
 
         #cameraContainer {
-            margin-top: 20px;
+            margin: 20px 0;
         }
 
         #cameraOverlayContainer {
@@ -43,33 +42,35 @@
         }
 
         #cameraOverlayContainer video,
-        #cameraOverlayContainer img {
+        #cameraOverlayContainer img,
+        #canvas {
             position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             object-fit: contain;
-            top: 0;
-            left: 0;
         }
 
-        #cameraOverlayContainer video {
-            z-index: 1;
-        }
-
-        #cameraOverlayContainer img {
+        #overlayImage {
             z-index: 2;
             pointer-events: none;
         }
 
-        #cameraControls {
-            margin-top: 20px;
+        video {
+            z-index: 1;
+        }
+
+        canvas {
+            z-index: 3;
+            display: none;
         }
 
         #preview {
             width: 100%;
             max-width: 300px;
-            display: none;
             margin: 20px auto;
+            display: none;
         }
 
         button {
@@ -127,25 +128,25 @@
     </style>
 </head>
 <body>
-    <h2 id="titleText">
+    <h2 id="titleText" style="font-size: 40px;">
         <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
         雲端列印，在EPSON8050
     </h2>
 
     <div id="cameraContainer">
         <div id="cameraOverlayContainer">
-            <video id="videoPreview" autoplay playsinline></video>
-            <!-- ❗️請將下方 src 改為你的圖片網址或正確相對路徑 -->
+            <video id="videoPreview" autoplay muted playsinline></video>
             <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back view.png" alt="Overlay" />
+            <canvas id="canvas"></canvas>
         </div>
 
-        <div id="cameraControls">
-            <button onclick="captureFromVideo()">拍照</button>
+        <div>
+            <button onclick="startCamera()">開啟相機</button>
+            <button onclick="captureFromVideo()">擷取畫面</button>
             <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
             <button onclick="exitPage()">離開</button>
         </div>
 
-        <canvas id="canvas" style="display:none;"></canvas>
         <img id="preview" src="" alt="預覽圖片">
     </div>
 
@@ -169,75 +170,30 @@
                 <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
                 雲端列印，在 ${printerName}
             `;
-            startCamera();
         });
 
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                document.getElementById("videoPreview").srcObject = stream;
-            } catch (err) {
-                console.error("無法開啟相機", err);
-                alert("請允許相機權限或確認裝置支援");
-            }
-        }
-
-        function getCurrentDateTime() {
-            const now = new Date();
-            return now.getFullYear().toString() +
-                String(now.getMonth() + 1).padStart(2, '0') +
-                String(now.getDate()).padStart(2, '0') +
-                String(now.getHours()).padStart(2, '0') +
-                String(now.getMinutes()).padStart(2, '0') +
-                String(now.getSeconds()).padStart(2, '0');
-        }
-
-        async function compressImageToTargetSize(img, targetSizeKB = 2048, maxAttempts = 10) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const maxDimension = 3200;
-
-            let width = img.width;
-            let height = img.height;
-            if (width > maxDimension || height > maxDimension) {
-                const ratio = Math.min(maxDimension / width, maxDimension / height);
-                width = Math.round(width * ratio);
-                height = Math.round(height * ratio);
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            context.drawImage(img, 0, 0, width, height);
-
-            let bestBase64 = "";
-            let bestSize = 0;
-
-            for (let q = 0.9; q >= 0.1; q -= 0.05) {
-                const base64 = canvas.toDataURL('image/jpeg', q);
-                const fileSizeKB = Math.round((base64.length * 3) / 4 / 1024);
-
-                if (fileSizeKB <= targetSizeKB && fileSizeKB > bestSize) {
-                    bestBase64 = base64;
-                    bestSize = fileSizeKB;
-                }
-
-                if (bestSize >= targetSizeKB) break;
-            }
-
-            console.log(`壓縮後圖片大小：${bestSize} KB`);
-            return bestBase64;
-        }
-
-        let capturedImage = null;
         const canvas = document.getElementById('canvas');
         const preview = document.getElementById('preview');
+        const processModal = document.getElementById('processModal');
         const sendButton = document.getElementById('send');
+        let capturedImage = null;
+
+        async function startCamera() {
+            const video = document.getElementById('videoPreview');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (error) {
+                alert("無法啟動相機：" + error.message);
+            }
+        }
 
         async function captureFromVideo() {
             const video = document.getElementById('videoPreview');
+            const rect = video.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
             const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const rawBase64 = canvas.toDataURL('image/jpeg');
@@ -252,47 +208,52 @@
             tempImg.src = rawBase64;
         }
 
-        function UploadImage() {
-            if (!capturedImage) {
-                alert('請先拍照');
-                return;
+        async function compressImageToTargetSize(img, targetSizeKB = 2048, maxAttempts = 10) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const maxDimension = 3200;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDimension || height > maxDimension) {
+                const ratio = Math.min(maxDimension / width, maxDimension / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
+            }
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(img, 0, 0, width, height);
+
+            let bestBase64 = "";
+            let bestSize = 0;
+
+            for (let q = 0.9; q >= 0.1; q -= 0.05) {
+                const base64 = canvas.toDataURL('image/jpeg', q);
+                const fileSizeKB = Math.round((base64.length * 3) / 4 / 1024);
+                if (fileSizeKB <= targetSizeKB && fileSizeKB > bestSize) {
+                    bestBase64 = base64;
+                    bestSize = fileSizeKB;
+                }
+                if (bestSize >= targetSizeKB * 1) break;
             }
 
-            const printerName = getQueryParam("PrinterName") || "E8050";
-            const base64Image = capturedImage.split(',')[1];
-            const data = {
-                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
-                "content": base64Image,
-                "comment": "API creation",
-                "overwriteIfExists": true,
-                "generateFileDetails": true
-            };
-
-            document.getElementById('processModal').style.display = 'block';
-
-            fetch(`https://labelcloudapi.onnicelabel.com/document/v2/files`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('processModal').style.display = 'none';
-                console.log(data);
-                sendImage();
-            })
-            .catch(err => {
-                document.getElementById('processModal').style.display = 'none';
-                console.error(err);
-                alert("API回傳失敗");
-            });
+            console.log(`壓縮後圖片大小：${bestSize} KB`);
+            return bestBase64;
         }
 
-        function sendImage() {
+        function getCurrentDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${year}${month}${day}${hours}${minutes}${seconds}`;
+        }
+
+        function sendImage(photopath) {
             const printerName = getQueryParam("PrinterName") || "E8050";
+            const base64Image = capturedImage.split(',')[1];
             const data = {
                 "deviceType": "CloudPrinter",
                 "deviceId": {
@@ -305,13 +266,13 @@
                 "quantity": "1",
                 "dataSources": [
                     {
-                        "PIC": "",
+                        "PIC": photopath,
                         "FileName": printerName + ".png"
                     }
                 ]
             };
 
-            document.getElementById('processModal').style.display = 'block';
+            processModal.style.display = 'block';
 
             fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', {
                 method: 'POST',
@@ -321,15 +282,56 @@
                 },
                 body: JSON.stringify(data)
             })
-            .then(res => res.json())
+            .then(response => response.json())
             .then(data => {
-                document.getElementById('processModal').style.display = 'none';
-                alert(`列印結果：${JSON.stringify(data)}`);
+                processModal.style.display = 'none';
+                alert(`API回覆: ${JSON.stringify(data)}`);
             })
-            .catch(err => {
-                document.getElementById('processModal').style.display = 'none';
-                alert("API列印錯誤");
-                console.error(err);
+            .catch(error => {
+                processModal.style.display = 'none';
+                alert('API回覆時出錯');
+                console.error('Error:', error);
+            });
+        }
+
+        function UploadImage() {
+            if (!capturedImage) {
+                alert('請先拍照');
+                return;
+            }
+
+            const printerName = getQueryParam("PrinterName") || "E8050";
+            const fileName = getCurrentDateTime() + ".jpg";
+            const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
+            const base64Image = capturedImage.split(',')[1];
+            const data = {
+                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
+                "content": base64Image,
+                "comment": "API creation",
+                "overwriteIfExists": true,
+                "generateFileDetails": true
+            };
+
+            processModal.style.display = 'block';
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                processModal.style.display = 'none';
+                console.log(data);
+                sendImage("");
+            })
+            .catch(error => {
+                processModal.style.display = 'none';
+                alert('API回覆時出錯');
+                console.error('Error:', error);
             });
         }
 
@@ -338,7 +340,7 @@
                 if (window.opener) {
                     window.close();
                 } else {
-                    alert("無法在本頁面關閉");
+                    alert("此功能無法在本頁面關閉。");
                 }
             }
         }
