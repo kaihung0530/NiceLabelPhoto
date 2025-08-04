@@ -141,7 +141,11 @@
         </div>
 
         <div>
-             <button onclick="promptCameraChoice()">開啟相機</button>
+			<select id="cameraSelector">
+				<option value="user">前鏡頭</option>
+				<option value="environment">後鏡頭</option>
+			</select>
+			<button onclick="promptCameraChoice()">開啟相機</button>
             <button onclick="captureFromVideo()">擷取畫面</button>
             <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
             <button onclick="exitPage()">離開</button>
@@ -179,8 +183,7 @@
         let capturedImage = null;
 		
         async function promptCameraChoice() {
-            const choice = confirm("您要開啟前鏡頭嗎？為否則開啟後鏡頭");
-            const facingMode = choice ? "user" : "environment";
+			const facingMode = document.getElementById("cameraSelector").value;
             startCamera(facingMode);
         }
         async function startCamera(facingMode) {
