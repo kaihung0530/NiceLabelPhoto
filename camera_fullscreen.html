@@ -166,7 +166,8 @@
   <div id="cameraContainer">
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
-    <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
+    <img id="overlayImage" crossorigin="anonymous" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
+	<!-- <img id="overlayImage" crossorigin="anonymous" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay"> -->
     <button class="camera-button" id="switchButton"><i class="fas fa-camera-rotate"></i></button>
 	<button class="camera-button" id="captureButton"><i class="fas fa-camera"></i></button>
   </div>
@@ -300,6 +301,7 @@
 	});
 }
         function sendImage(photopath) {
+			console.log("sendImage");
             const printerName = getQueryParam("PrinterName") || "E8050";
             const base64Image = capturedImage.split(',')[1];
             const data = {
