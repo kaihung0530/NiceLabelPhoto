@@ -19,13 +19,18 @@
             height: 100%;
         }
 
-        video, canvas {
+        video, canvas, #overlayImage {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+
+        #overlayImage {
+            z-index: 5;
+            pointer-events: none;
         }
 
         #captureButton {
@@ -47,6 +52,7 @@
     <div id="cameraContainer">
         <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas"></canvas>
+        <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back%20view.png" alt="Overlay">
         <button id="captureButton">拍照</button>
     </div>
 
@@ -67,9 +73,14 @@
             const ctx = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+
+            // 繪製影像畫面
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // 預覽（或可儲存 / 傳送）
+            // 再疊上 overlay 圖片（可選）
+            const overlay = document.getElementById('overlayImage');
+            ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+
             const dataUrl = canvas.toDataURL("image/jpeg");
             console.log("拍照完成", dataUrl);
             alert("已拍照！");
