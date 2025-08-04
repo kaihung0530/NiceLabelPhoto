@@ -124,7 +124,7 @@
 		 async function compressImageToTargetSize(img, targetSizeKB = 200, maxAttempts = 30) {
 			const canvas = document.createElement('canvas');
 			const context = canvas.getContext('2d');
-			const maxDimension = 800;
+			const maxDimension = 1000;
 
 			let width = img.width;
 			let height = img.height;
@@ -247,7 +247,7 @@
             .then(data => {
                 processModal.style.display = 'none';
                 console.log(data);
-                sendImage("");
+                //sendImage("");
             })
             .catch(error => {
                 processModal.style.display = 'none';
