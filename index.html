@@ -1,6 +1,4 @@
 <!DOCTYPE html>
-<!-- 網址輸入: https://kaihung0530.github.io/NiceLabelPhoto/index.html?PrinterName=E6550-->
-<!-- PrinterName為變數可對應到NiceLabelCloud上面的CloudPrinterName-->
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -13,7 +11,7 @@
             margin: 0;
             padding: 0;
         }
-        h1 {
+        h2 {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -21,20 +19,46 @@
             color: white;
             padding: 1em;
             margin: 0;
+            font-size: 40px;
         }
-        h1 img {
+        h2 img {
             height: 50px;
             margin-right: 10px;
         }
-        #cameraContainer {
-            margin: 20px 0;
-        }
-        video, canvas, img {
+
+        #cameraOverlayContainer {
+            position: relative;
             width: 100%;
             max-width: 300px;
-            display: block;
             margin: 20px auto;
         }
+
+        #cameraOverlayContainer img,
+        #cameraOverlayContainer video {
+            position: absolute;
+            width: 100%;
+            height: auto;
+            top: 0;
+            left: 0;
+            object-fit: contain;
+        }
+
+        #cameraOverlayContainer img {
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        #cameraOverlayContainer video {
+            z-index: 1;
+        }
+
+        #preview {
+            width: 100%;
+            max-width: 300px;
+            display: none;
+            margin: 20px auto;
+        }
+
         button {
             padding: 15px 30px;
             font-size: 18px;
@@ -45,9 +69,11 @@
             cursor: pointer;
             margin: 10px 5px;
         }
+
         button:hover {
             background-color: #004a91;
         }
+
         #processModal {
             display: none;
             position: fixed;
@@ -59,6 +85,7 @@
             background-color: rgba(0, 0, 0, 0.5);
             text-align: center;
         }
+
         #processModal .modal-content {
             position: relative;
             top: 50%;
@@ -69,6 +96,7 @@
             display: inline-block;
             text-align: center;
         }
+
         #loader {
             border: 8px solid #f3f3f3;
             border-radius: 50%;
@@ -78,6 +106,7 @@
             animation: spin 1s linear infinite;
             margin: 0 auto;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -85,58 +114,67 @@
     </style>
 </head>
 <body>
-    <h2 id="titleText" style="font-size: 40px;">
+    <h2 id="titleText">
         <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
         雲端列印，在EPSON8050
     </h2>
+
     <div id="cameraContainer">
-        <input type="file" accept="image/*" id="cameraInput" capture="environment" style="display: none;" onchange="previewImage(event)">
+        <div id="cameraOverlayContainer">
+            <video id="videoPreview" autoplay playsinline></video>
+            <!-- 請確保這張圖路徑正確：可換成 GitHub 連結或上傳圖片 -->
+            <img id="overlayImage" src="https://kaihung0530.github.io/NiceLabelPhoto/Back view.png" alt="Overlay" />
+        </div>
         <div>
-            <button id="takePhoto" onclick="document.getElementById('cameraInput').click()">拍照</button>
+            <button onclick="captureFromVideo()">拍照</button>
             <button id="send" onclick="UploadImage()" disabled>傳送照片</button>
-            <button id="exit" onclick="exitPage()">離開</button>
+            <button onclick="exitPage()">離開</button>
         </div>
         <canvas id="canvas" style="display:none;"></canvas>
-        <img id="preview" src="" alt="預覽圖片" style="display:none;">
+        <img id="preview" src="" alt="預覽圖片">
     </div>
+
     <div id="processModal">
         <div class="modal-content">
             <div id="loader"></div>
             <p>正在處理中，請稍後...</p>
         </div>
     </div>
+
     <script>
-        // 工具函式：取得 URL 中的參數
         function getQueryParam(param) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(param);
         }
 
-        // DOM 載入後更新標題
         document.addEventListener("DOMContentLoaded", function () {
             const printerParam = getQueryParam("PrinterName") || "E8050";
-			const printerName = printerParam.replace(/^E/, "EPSON");
+            const printerName = printerParam.replace(/^E/, "EPSON");
             document.getElementById("titleText").innerHTML = `
                 <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
                 雲端列印，在 ${printerName}
             `;
+            startCamera();
         });
 
-        const canvas = document.getElementById('canvas');
-        const preview = document.getElementById('preview');
-        const processModal = document.getElementById('processModal');
-        const sendButton = document.getElementById('send');
-        let capturedImage = null;
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                document.getElementById("videoPreview").srcObject = stream;
+            } catch (err) {
+                console.error("無法開啟相機", err);
+                alert("請允許相機權限或確認裝置支援");
+            }
+        }
 
         function getCurrentDateTime() {
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            return `${year}${month}${day}${hours}${minutes}${seconds}`;
+            return now.getFullYear().toString() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0') +
+                String(now.getHours()).padStart(2, '0') +
+                String(now.getMinutes()).padStart(2, '0') +
+                String(now.getSeconds()).padStart(2, '0');
         }
 
         async function compressImageToTargetSize(img, targetSizeKB = 2048, maxAttempts = 10) {
@@ -151,6 +189,7 @@
                 width = Math.round(width * ratio);
                 height = Math.round(height * ratio);
             }
+
             canvas.width = width;
             canvas.height = height;
             context.drawImage(img, 0, 0, width, height);
@@ -167,43 +206,77 @@
                     bestSize = fileSizeKB;
                 }
 
-                if (bestSize >= targetSizeKB * 1) break;
+                if (bestSize >= targetSizeKB) break;
             }
 
             console.log(`壓縮後圖片大小：${bestSize} KB`);
             return bestBase64;
         }
 
-        async function previewImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        let capturedImage = null;
+        const canvas = document.getElementById('canvas');
+        const preview = document.getElementById('preview');
+        const sendButton = document.getElementById('send');
 
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const img = new Image();
-                img.onload = async function() {
-                    const originalSizeKB = Math.round(file.size / 1024);
-                    let resultBase64;
+        async function captureFromVideo() {
+            const video = document.getElementById('videoPreview');
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                    if (originalSizeKB > 1024) {
-                        console.log(`原始圖片 ${originalSizeKB}KB > 1024KB，進行壓縮...`);
-                        resultBase64 = await compressImageToTargetSize(img, 2048);
-                    } else {
-                        console.log(`原始圖片 ${originalSizeKB}KB 小於 1MB，直接使用原圖`);
-                        resultBase64 = e.target.result;
-                    }
-
-                    capturedImage = resultBase64;
-                    preview.src = resultBase64;
-                    preview.style.display = 'block';
-                    sendButton.disabled = false;
-                };
-                img.src = e.target.result;
+            const rawBase64 = canvas.toDataURL('image/jpeg');
+            const tempImg = new Image();
+            tempImg.onload = async () => {
+                const compressed = await compressImageToTargetSize(tempImg, 2048);
+                capturedImage = compressed;
+                preview.src = compressed;
+                preview.style.display = 'block';
+                sendButton.disabled = false;
             };
-            reader.readAsDataURL(file);
+            tempImg.src = rawBase64;
         }
 
-        function sendImage(photopath) {
+        function UploadImage() {
+            if (!capturedImage) {
+                alert('請先拍照');
+                return;
+            }
+
+            const printerName = getQueryParam("PrinterName") || "E8050";
+            const base64Image = capturedImage.split(',')[1];
+            const data = {
+                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
+                "content": base64Image,
+                "comment": "API creation",
+                "overwriteIfExists": true,
+                "generateFileDetails": true
+            };
+
+            document.getElementById('processModal').style.display = 'block';
+
+            fetch(`https://labelcloudapi.onnicelabel.com/document/v2/files`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('processModal').style.display = 'none';
+                console.log(data);
+                sendImage();
+            })
+            .catch(err => {
+                document.getElementById('processModal').style.display = 'none';
+                console.error(err);
+                alert("API回傳失敗");
+            });
+        }
+
+        function sendImage() {
             const printerName = getQueryParam("PrinterName") || "E8050";
             const base64Image = capturedImage.split(',')[1];
             const data = {
@@ -218,13 +291,13 @@
                 "quantity": "1",
                 "dataSources": [
                     {
-                        "PIC": photopath,
+                        "PIC": "",
                         "FileName": printerName + ".png"
                     }
                 ]
             };
 
-            processModal.style.display = 'block';
+            document.getElementById('processModal').style.display = 'block';
 
             fetch('https://labelcloudapi.onnicelabel.com/Print/v2/Print', {
                 method: 'POST',
@@ -234,56 +307,15 @@
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            .then(res => res.json())
             .then(data => {
-                processModal.style.display = 'none';
-                alert(`API回覆: ${JSON.stringify(data)}`);
+                document.getElementById('processModal').style.display = 'none';
+                alert(`列印結果：${JSON.stringify(data)}`);
             })
-            .catch(error => {
-                processModal.style.display = 'none';
-                alert('API回覆時出錯');
-                console.error('Error:', error);
-            });
-        }
-
-        function UploadImage() {
-            if (!capturedImage) {
-                alert('請先拍照');
-                return;
-            }
-
-            const printerName = getQueryParam("PrinterName") || "E8050";
-            const fileName = getCurrentDateTime() + ".jpg";
-            const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
-            const base64Image = capturedImage.split(',')[1];
-            const data = {
-                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
-                "content": base64Image,
-                "comment": "API creation",
-                "overwriteIfExists": true,
-                "generateFileDetails": true
-            };
-
-            processModal.style.display = 'block';
-
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Ocp-Apim-Subscription-Key': '51808763a19243ca8694dc2f72cf7408'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                processModal.style.display = 'none';
-                console.log(data);
-                sendImage("");
-            })
-            .catch(error => {
-                processModal.style.display = 'none';
-                alert('API回覆時出錯');
-                console.error('Error:', error);
+            .catch(err => {
+                document.getElementById('processModal').style.display = 'none';
+                alert("API列印錯誤");
+                console.error(err);
             });
         }
 
@@ -292,7 +324,7 @@
                 if (window.opener) {
                     window.close();
                 } else {
-                    alert("此功能無法在本頁面關閉。");
+                    alert("無法在本頁面關閉");
                 }
             }
         }
