@@ -166,10 +166,10 @@
         document.addEventListener("DOMContentLoaded", function () {
             const printerParam = getQueryParam("PrinterName") || "E8050";
             const printerName = printerParam.replace(/^E/, "EPSON");
-            document.getElementById("titleText").innerHTML = 
+            document.getElementById("titleText").innerHTML = `
                 <img src="https://kaihung0530.github.io/NiceLabelPhoto/Loftware_logo.jpg" alt="公司Logo">
                 雲端列印，在 ${printerName}
-            ;
+            `;
         });
 
         const canvas = document.getElementById('canvas');
@@ -236,7 +236,7 @@
                 if (bestSize >= targetSizeKB * 1) break;
             }
 
-            console.log(壓縮後圖片大小：${bestSize} KB);
+            console.log(`壓縮後圖片大小：${bestSize} KB`);
             return bestBase64;
         }
 
@@ -248,7 +248,7 @@
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
-            return ${year}${month}${day}${hours}${minutes}${seconds};
+            return `${year}${month}${day}${hours}${minutes}${seconds}`;
         }
 
         function sendImage(photopath) {
@@ -285,7 +285,7 @@
             .then(response => response.json())
             .then(data => {
                 processModal.style.display = 'none';
-                alert(API回覆: ${JSON.stringify(data)});
+                alert(`API回覆: ${JSON.stringify(data)}`);
             })
             .catch(error => {
                 processModal.style.display = 'none';
@@ -302,10 +302,10 @@
 
             const printerName = getQueryParam("PrinterName") || "E8050";
             const fileName = getCurrentDateTime() + ".jpg";
-            const url = https://labelcloudapi.onnicelabel.com/document/v2/files;
+            const url = `https://labelcloudapi.onnicelabel.com/document/v2/files`;
             const base64Image = capturedImage.split(',')[1];
             const data = {
-                "filePath": /DelenTest/Base64PIC/Graphics/${printerName}.png,
+                "filePath": `/DelenTest/Base64PIC/Graphics/${printerName}.png`,
                 "content": base64Image,
                 "comment": "API creation",
                 "overwriteIfExists": true,
@@ -326,7 +326,7 @@
             .then(data => {
                 processModal.style.display = 'none';
                 console.log(data);
-                //sendImage("");
+                sendImage("");
             })
             .catch(error => {
                 processModal.style.display = 'none';
