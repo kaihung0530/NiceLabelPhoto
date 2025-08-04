@@ -98,7 +98,7 @@
         currentStream = stream;
         currentFacing = facingMode;
         console.log(`已啟用鏡頭：${facingMode}`);
-		console.log("Tracks:", stream.getTracks());
+		
       } catch (err) {
         alert("無法啟用相機：" + err.message);
       }
@@ -119,6 +119,7 @@
       const dataUrl = canvas.toDataURL("image/jpeg");
       console.log("拍照完成", dataUrl);
       alert("已拍照！");
+	  video.play();
     });
 
     // 切換鏡頭
