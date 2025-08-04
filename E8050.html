@@ -149,7 +149,7 @@
 					bestSize = fileSizeKB;
 				}
 
-				if (bestSize >= targetSizeKB * 0.95) break; // 若已非常接近目標大小則停止
+				if (bestSize >= targetSizeKB * 1) break; // 若已非常接近目標大小則停止
 			}
 
 			console.log(`壓縮後圖片大小：${bestSize} KB`);
