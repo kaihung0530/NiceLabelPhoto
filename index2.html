@@ -29,25 +29,27 @@
             margin-right: 10px;
         }
 
-        #cameraChoiceModal {
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+		#cameraChoiceModal {
+			display: none;
+			position: fixed;
+			z-index: 1000;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0,0,0,0.6);
+			text-align: center;
+		}
 
-        #cameraChoiceModal .modal-content {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-        }
+		#cameraChoiceModal .modal-content {
+			position: relative;
+			top: 50%;
+			transform: translateY(-50%);
+			background-color: white;
+			padding: 20px;
+			border-radius: 10px;
+			display: inline-block;
+		}
 
         button {
             padding: 15px 30px;
@@ -78,8 +80,19 @@
             <button onclick="startCameraInNewTab('environment')">後鏡頭</button>
         </div>
     </div>
+	<div>
+		<button onclick="startCameraInNewTab('environment')">開啟相機</button>
+
+	</div>
 
     <script>
+		function showCameraChoice() {
+			document.getElementById("cameraChoiceModal").style.display = "block";
+		}
+
+		function closeCameraChoice() {
+			document.getElementById("cameraChoiceModal").style.display = "none";
+		}
         function getQueryParam(param) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(param);
