@@ -40,6 +40,7 @@
             aspect-ratio: 3 / 4;
             background: black;
             overflow: hidden;
+			display: none; /* 初始隱藏 */
         }
 
         #cameraOverlayContainer video,
@@ -226,6 +227,7 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
                 video.srcObject = stream;
+				document.getElementById('cameraOverlayContainer').style.display = 'block'; // 顯示相機畫面區
             } catch (error) {
                 alert("無法啟動相機：" + error.message);
             }
