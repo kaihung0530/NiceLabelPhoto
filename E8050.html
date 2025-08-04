@@ -121,10 +121,10 @@
             return `${year}${month}${day}${hours}${minutes}${seconds}`;
         }
 
-		 async function compressImageToTargetSize(img, targetSizeKB = 200, maxAttempts = 30) {
+		 async function compressImageToTargetSize(img, targetSizeKB = 1024, maxAttempts = 10) {
 			const canvas = document.createElement('canvas');
 			const context = canvas.getContext('2d');
-			const maxDimension = 1000;
+			const maxDimension = 1600;
 
 			let width = img.width;
 			let height = img.height;
