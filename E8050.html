@@ -156,24 +156,34 @@
 			return bestBase64;
 		}
 
-        async function previewImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+		async function previewImage(event) {
+			const file = event.target.files[0];
+			if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const img = new Image();
-                img.onload = async function() {
-                    const compressed = await compressImageToTargetSize(img, 2048);
-                    capturedImage = compressed;
-                    preview.src = compressed;
-                    preview.style.display = 'block';
-                    sendButton.disabled = false;
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+			const reader = new FileReader();
+			reader.onload = async function(e) {
+				const img = new Image();
+				img.onload = async function() {
+					const originalSizeKB = Math.round(file.size / 1024);
+					let resultBase64;
+
+					if (originalSizeKB > 1024) {
+						console.log(`原始圖片 ${originalSizeKB}KB > 1024KB，進行壓縮...`);
+						resultBase64 = await compressImageToTargetSize(img, 1024); // 壓縮到1MB以內
+					} else {
+						console.log(`原始圖片 ${originalSizeKB}KB 小於 1MB，直接使用原圖`);
+						resultBase64 = e.target.result;
+					}
+
+					capturedImage = resultBase64;
+					preview.src = resultBase64;
+					preview.style.display = 'block';
+					sendButton.disabled = false;
+				};
+				img.src = e.target.result;
+			};
+			reader.readAsDataURL(file);
+		}
 
         function sendImage(photopath) {
             const base64Image = capturedImage.split(',')[1];
