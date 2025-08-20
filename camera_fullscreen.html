@@ -258,18 +258,18 @@
 	  previewCanvas.height = height;
 
 	  // ✅ 上傳用圖片（不含底圖）也套用鏡像（僅當前鏡頭為前鏡頭）
-	  if (currentFacing === 'user') {
-		uploadCtx.translate(width, 0);
+	  //if (currentFacing === 'user') {
+		//uploadCtx.translate(width, 0);
 		//uploadCtx.scale(-1, 1);
-	  }
+	  //}
 	  uploadCtx.drawImage(video, 0, 0, width, height);
 	  capturedImage = uploadCanvas.toDataURL("image/jpeg");
 
 	  // ✅ 預覽用圖片（含底圖），也套用鏡像
-	  if (currentFacing === 'user') {
-		previewCtx.translate(width, 0);
-		previewCtx.scale(-1, 1);
-	  }
+	  //if (currentFacing === 'user') {
+		//previewCtx.translate(width, 0);
+		//previewCtx.scale(-1, 1);
+	  //}
 	  previewCtx.drawImage(video, 0, 0, width, height);
 	  previewCtx.setTransform(1, 0, 0, 1, 0, 0); // 重設 transform 才能正常畫 overlay
 	  previewCtx.drawImage(overlay, 0, 0, width, height);
@@ -326,7 +326,7 @@
 	.then(data => {
 		processModal.style.display = 'none';
 		console.log(data);
-		sendImage("");
+		//sendImage("");
 	})
 	.catch(error => {
 		processModal.style.display = 'none';
