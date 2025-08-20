@@ -260,7 +260,7 @@
 	  // ✅ 上傳用圖片（不含底圖）也套用鏡像（僅當前鏡頭為前鏡頭）
 	  if (currentFacing === 'user') {
 		uploadCtx.translate(width, 0);
-		uploadCtx.scale(-1, 1);
+		//uploadCtx.scale(-1, 1);
 	  }
 	  uploadCtx.drawImage(video, 0, 0, width, height);
 	  capturedImage = uploadCanvas.toDataURL("image/jpeg");
