@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Todo Dashboard</title>
+<style>
+  :root {
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;  /* blue  - 報價 */
+    --series-2:       #1baf7a;  /* aqua  - 測試 */
+    --status-good:    #0ca30c;
+    --status-warning: #fab219;
+    --status-critical:#d03b3b;
+    --shadow:         0 1px 2px rgba(11,11,11,0.04), 0 4px 16px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-2:       #199e70;
+      --status-good:    #0ca30c;
+      --status-warning: #fab219;
+      --status-critical:#d03b3b;
+      --shadow:         0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 24px 64px; }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .tile .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .tile .value { font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+  .tile .value.good     { color: var(--status-good); }
+  .tile .value.warning  { color: var(--status-warning); }
+  .tile .value.critical { color: var(--status-critical); }
+  .tile .foot { font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+
+  /* panels */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 18px; color: var(--text-secondary); }
+
+  /* horizontal bars */
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-key { display: flex; align-items: center; gap: 8px; width: 96px; flex: none; font-size: 13px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .bar-track { flex: 1; height: 12px; background: var(--gridline); border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .bar-val { width: 22px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-secondary); flex: none; }
+
+  /* progress ring */
+  .ring-wrap { display: flex; align-items: center; gap: 20px; }
+  .ring { position: relative; width: 108px; height: 108px; flex: none; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring .center .pct { font-size: 24px; font-weight: 700; line-height: 1; }
+  .ring .center .cap { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .ring-legend { font-size: 13px; color: var(--text-secondary); }
+  .ring-legend div { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+
+  /* task table */
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); font-weight: 600; padding: 0 12px 10px; border-bottom: 1px solid var(--gridline);
+  }
+  tbody td { padding: 14px 12px; border-bottom: 1px solid var(--gridline); font-size: 14px; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  .task-name { font-weight: 500; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); }
+  .pill .dot { width: 8px; height: 8px; border-radius: 999px; }
+  .muted { color: var(--text-muted); }
+  footer { margin-top: 28px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+  @media (max-width: 720px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+  // ---- Todo data (from Todoist, Inbox) ----
+  const generatedAt = "2026-07-02";
+  const tasks = [
+    { name: "安排聯合骨科檢測模板測試", priority: "p4", due: null, checked: false, category: "測試" },
+    { name: "宏益冷凍軟體報價",       priority: "p4", due: null, checked: false, category: "報價" },
+    { name: "宏點娛樂軟體報價",       priority: "p4", due: null, checked: false, category: "報價" },
+  ];
+
+  const CAT_COLOR = { "報價": "var(--series-1)", "測試": "var(--series-2)" };
+
+  // ---- Derived stats ----
+  const total     = tasks.length;
+  const done      = tasks.filter(t => t.checked).length;
+  const open      = total - done;
+  const overdue   = tasks.filter(t => !t.checked && t.due && new Date(t.due) < new Date(generatedAt)).length;
+  const noDate    = tasks.filter(t => !t.due).length;
+  const completion = total ? Math.round(done / total * 100) : 0;
+
+  // category breakdown
+  const catCounts = {};
+  tasks.forEach(t => catCounts[t.category] = (catCounts[t.category] || 0) + 1);
+  const maxCat = Math.max(1, ...Object.values(catCounts));
+
+  const PRIO_LABEL = { p1: "P1 · 緊急", p2: "P2 · 高", p3: "P3 · 中", p4: "一般" };
+  const PRIO_COLOR = { p1: "var(--status-critical)", p2: "var(--status-warning)", p3: "var(--series-1)", p4: "var(--baseline)" };
+
+  // ---- Render ----
+  const el = document.getElementById("app");
+
+  const tiles = [
+    { label: "任務總數",   value: total,   cls: "",        foot: "全部在 Inbox" },
+    { label: "待完成",     value: open,    cls: "warning", foot: `${completion}% 已完成` },
+    { label: "已逾期",     value: overdue, cls: overdue ? "critical" : "good", foot: overdue ? "需盡快處理" : "沒有逾期" },
+    { label: "未排期",     value: noDate,  cls: "",        foot: "尚未設定日期" },
+  ];
+
+  const tilesHtml = tiles.map(t => `
+    <div class="tile">
+      <div class="label">${t.label}</div>
+      <div class="value ${t.cls}">${t.value}</div>
+      <div class="foot">${t.foot}</div>
+    </div>`).join("");
+
+  const barsHtml = Object.entries(catCounts).map(([cat, n]) => `
+    <div class="bar-row">
+      <div class="bar-key"><span class="swatch" style="background:${CAT_COLOR[cat] || 'var(--baseline)'}"></span>${cat}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${n / maxCat * 100}%;background:${CAT_COLOR[cat] || 'var(--baseline)'}"></div></div>
+      <div class="bar-val">${n}</div>
+    </div>`).join("");
+
+  // progress ring geometry
+  const R = 46, C = 2 * Math.PI * R, off = C * (1 - completion / 100);
+
+  const ringHtml = `
+    <div class="ring-wrap">
+      <div class="ring">
+        <svg width="108" height="108" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--gridline)" stroke-width="10"/>
+          <circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--status-good)" stroke-width="10"
+                  stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/>
+        </svg>
+        <div class="center"><div class="pct">${completion}%</div><div class="cap">完成</div></div>
+      </div>
+      <div class="ring-legend">
+        <div><span class="swatch" style="background:var(--status-good)"></span>已完成 ${done}</div>
+        <div><span class="swatch" style="background:var(--gridline)"></span>待完成 ${open}</div>
+      </div>
+    </div>`;
+
+  const rowsHtml = tasks.map(t => {
+    const catColor = CAT_COLOR[t.category] || "var(--baseline)";
+    return `
+    <tr>
+      <td class="task-name">${t.name}</td>
+      <td><span class="pill"><span class="dot" style="background:${catColor}"></span>${t.category}</span></td>
+      <td><span class="pill"><span class="dot" style="background:${PRIO_COLOR[t.priority]}"></span>${PRIO_LABEL[t.priority]}</span></td>
+      <td class="muted">${t.due || "—"}</td>
+      <td><span class="pill"><span class="dot" style="background:${t.checked ? 'var(--status-good)' : 'var(--status-warning)'}"></span>${t.checked ? "已完成" : "待處理"}</span></td>
+    </tr>`;
+  }).join("");
+
+  el.innerHTML = `
+    <header>
+      <h1>Todo Dashboard</h1>
+      <p class="subtitle">Todoist · Inbox &nbsp;•&nbsp; 更新於 ${generatedAt}</p>
+    </header>
+
+    <section class="tiles">${tilesHtml}</section>
+
+    <section class="grid2">
+      <div class="panel">
+        <h2>依類別分佈</h2>
+        ${barsHtml}
+      </div>
+      <div class="panel">
+        <h2>完成進度</h2>
+        ${ringHtml}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>任務清單</h2>
+      <table>
+        <thead>
+          <tr><th>任務</th><th>類別</th><th>優先級</th><th>截止日</th><th>狀態</th></tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </section>
+
+    <footer>資料來源：Todoist　·　共 ${total} 筆任務</footer>`;
+</script>
+</body>
+</html>
