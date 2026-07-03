@@ -169,7 +169,9 @@ const LINE_HELP = [
   "新增:行程 : 日期 時間 內容 @地點",
   "　例如「行程 : 明天 14:00 拜訪宏益 @宜兒樂澄清店」",
   "　例如「行程 : 7/10 出差台中」(全天,@地點可省略)",
-  "查看:今天行程 / 明天行程 / 本週行程"
+  "查看:今天行程 / 明天行程 / 本週行程",
+  "改期:改行程 2 明天 15:00(先查行程看編號)",
+  "刪除:刪行程 2"
 ].join("\n");
 
 async function processLineCommand(text, env) {
@@ -192,6 +194,16 @@ async function processLineCommand(text, env) {
   if (/^(本週|本周|一週|一周|近期)?行程$/.test(t)) {
     try { return await gcalListRange(0, 7, "未來 7 天", env); }
     catch (e) { return "❌ 查詢行程失敗:" + e.message; }
+  }
+  g = t.match(/^(?:改|修改)行程\s*(\d+)\s*[:：]?\s*(.*)$/s);
+  if (g) {
+    try { return await gcalModify(Number(g[1]), g[2], env); }
+    catch (e) { return "❌ 修改行程失敗:" + e.message; }
+  }
+  g = t.match(/^(?:刪|刪除|删|删除)行程\s*(\d+)$/);
+  if (g) {
+    try { return await gcalDelete(Number(g[1]), env); }
+    catch (e) { return "❌ 刪除行程失敗:" + e.message; }
   }
 
   let tasks = (await env.TODO_KV.get("todos", "json")) || [];
@@ -299,10 +311,11 @@ async function googleAccessToken(env) {
   return j.access_token;
 }
 
-/* 解析「日期 [時間] 內容」,支援 今天/明天/後天、7/10、2026/7/10、14:00、下午2點、2點半 */
-function parseSchedule(text) {
+/* 解析開頭的「日期 [時間]」,支援 今天/明天/後天、7/10、2026/7/10、14:00、下午2點、2點半
+   日期或時間都可以單獨出現;回傳 {y,mo,da(可為 null), hh,mm(hh 可為 null), rest} */
+function parseWhen(text) {
   let rest = String(text || "").trim();
-  let y, mo, da;
+  let y = null, mo = null, da = null;
 
   let m = rest.match(/^(今天|明天|後天)\s*/);
   if (m) {
@@ -313,8 +326,6 @@ function parseSchedule(text) {
     y = +m[1]; mo = +m[2]; da = +m[3]; rest = rest.slice(m[0].length);
   } else if ((m = rest.match(/^(\d{1,2})[\/\-](\d{1,2})\s*/))) {
     const p = twDateParts(0); y = p.y; mo = +m[1]; da = +m[2]; rest = rest.slice(m[0].length);
-  } else {
-    return null;
   }
 
   let hh = null, mm = 0;
@@ -328,13 +339,34 @@ function parseSchedule(text) {
     hh = fixAmPm(m[1], +m[2]); mm = m[3] ? 30 : 0; rest = rest.slice(m[0].length);
   }
 
-  let title = rest.trim();
+  return { y: y, mo: mo, da: da, hh: hh, mm: mm, rest: rest };
+}
+
+/* 解析「日期 [時間] 內容 [@地點]」(新增行程用,日期必填) */
+function parseSchedule(text) {
+  const w = parseWhen(text);
+  if (w.y === null) return null;
+
+  let title = w.rest.trim();
   let location = null;
   const lm = title.match(/[@＠]\s*(.+)$/);
   if (lm) { location = lm[1].trim(); title = title.slice(0, lm.index).trim(); }
   if (!title) return null;
-  return { y: y, mo: mo, da: da, hh: hh, mm: mm, title: title, location: location };
+  return { y: w.y, mo: w.mo, da: w.da, hh: w.hh, mm: w.mm, title: title, location: location };
 }
+
+/* ms(UTC) -> 台灣時間的 ISO 字串 */
+function isoTW(ms) {
+  const d = new Date(ms + 8 * 3600 * 1000);
+  return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate()) +
+    "T" + pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes()) + ":00+08:00";
+}
+function nextDayStr(dateStr) {
+  const p = dateStr.split("-");
+  const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]) + 86400000);
+  return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate());
+}
+function mdText(dateStr) { const p = dateStr.split("-"); return (+p[1]) + "/" + (+p[2]); }
 
 async function gcalAdd(text, env) {
   const p = parseSchedule(text);
@@ -382,6 +414,7 @@ async function gcalListRange(fromDays, toDays, label, env) {
   if (!items.length) return "📅 " + label + "沒有安排行程,好好休息 😌";
 
   const lines = [];
+  const mapping = [];   // 記住編號對應,給「改行程 N / 刪行程 N」用
   let lastDate = "";
   for (const ev of items) {
     let dateKey, timeText;
@@ -399,9 +432,78 @@ async function gcalListRange(fromDays, toDays, label, env) {
       lines.push((lines.length ? "\n" : "") + "▍" + (+dd[1]) + "/" + (+dd[2]) + "(" + WEEKDAY[wd] + ")");
       lastDate = dateKey;
     }
-    lines.push("• " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? "\n　📍 " + ev.location : ""));
+    let durMin = null;
+    if (ev.start && ev.start.dateTime && ev.end && ev.end.dateTime) {
+      durMin = Math.round((Date.parse(ev.end.dateTime) - Date.parse(ev.start.dateTime)) / 60000);
+    }
+    mapping.push({ id: ev.id, summary: ev.summary || "(未命名)", date: dateKey, time: timeText === "全天" ? null : timeText, durMin: durMin });
+    lines.push(mapping.length + ". " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? "\n　📍 " + ev.location : ""));
   }
-  return "📅 " + label + "的行程\n\n" + lines.join("\n");
+  await env.TODO_KV.put("gcal_last_list", JSON.stringify(mapping), { expirationTtl: 86400 });
+  return "📅 " + label + "的行程\n\n" + lines.join("\n") +
+    "\n\n改期:改行程 1 明天 15:00\n刪除:刪行程 1";
+}
+
+async function gcalModify(n, whenText, env) {
+  const list = (await env.TODO_KV.get("gcal_last_list", "json")) || [];
+  if (!list.length) return "請先傳「本週行程」(或今天/明天行程)看編號,再用「改行程 編號 新時間」";
+  if (n < 1 || n > list.length) return "找不到第 " + n + " 筆,上次清單共 " + list.length + " 筆。先傳「本週行程」確認編號喔。";
+  const it = list[n - 1];
+
+  const w = parseWhen(whenText);
+  if (w.y === null && w.hh === null) {
+    return "格式:改行程 " + n + " 明天 15:00\n(只給日期=時間照舊;只給時間=日期照舊)";
+  }
+
+  const newDate = w.y !== null ? (w.y + "-" + pad2(w.mo) + "-" + pad2(w.da)) : it.date;
+  let hh = null, mm = 0;
+  if (w.hh !== null) { hh = w.hh; mm = w.mm; }
+  else if (it.time) { hh = +it.time.slice(0, 2); mm = +it.time.slice(3, 5); }
+
+  let body, newWhen;
+  if (hh === null) {
+    body = { start: { date: newDate, dateTime: null }, end: { date: nextDayStr(newDate), dateTime: null } };
+    newWhen = mdText(newDate) + " 全天";
+  } else {
+    const dur = it.durMin || 60;
+    const startMs = Date.parse(newDate + "T" + pad2(hh) + ":" + pad2(mm) + ":00+08:00");
+    body = {
+      start: { dateTime: isoTW(startMs), date: null, timeZone: "Asia/Taipei" },
+      end: { dateTime: isoTW(startMs + dur * 60000), date: null, timeZone: "Asia/Taipei" }
+    };
+    newWhen = mdText(newDate) + " " + pad2(hh) + ":" + pad2(mm);
+  }
+
+  const token = await googleAccessToken(env);
+  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(env.GOOGLE_CALENDAR_ID) + "/events/" + encodeURIComponent(it.id), {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "authorization": "Bearer " + token },
+    body: JSON.stringify(body)
+  });
+  const j = await res.json();
+  if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
+
+  it.date = newDate; it.time = hh === null ? null : pad2(hh) + ":" + pad2(mm);
+  await env.TODO_KV.put("gcal_last_list", JSON.stringify(list), { expirationTtl: 86400 });
+  return "🔁 已改期:\n「" + it.summary + "」\n新時間:" + newWhen;
+}
+
+async function gcalDelete(n, env) {
+  const list = (await env.TODO_KV.get("gcal_last_list", "json")) || [];
+  if (!list.length) return "請先傳「本週行程」(或今天/明天行程)看編號,再用「刪行程 編號」";
+  if (n < 1 || n > list.length) return "找不到第 " + n + " 筆,上次清單共 " + list.length + " 筆。先傳「本週行程」確認編號喔。";
+  const it = list[n - 1];
+
+  const token = await googleAccessToken(env);
+  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(env.GOOGLE_CALENDAR_ID) + "/events/" + encodeURIComponent(it.id), {
+    method: "DELETE",
+    headers: { "authorization": "Bearer " + token }
+  });
+  if (!res.ok && res.status !== 204 && res.status !== 410) throw new Error("HTTP " + res.status);
+
+  list.splice(n - 1, 1);
+  await env.TODO_KV.put("gcal_last_list", JSON.stringify(list), { expirationTtl: 86400 });
+  return "🗑 已刪除行程:\n「" + it.summary + "」";
 }
 
 const HTML = `<!DOCTYPE html>
