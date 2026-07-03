@@ -169,7 +169,7 @@ const LINE_HELP = [
   "新增:行程 : 日期 時間 內容 @地點",
   "　例如「行程 : 明天 14:00 拜訪宏益 @宜兒樂澄清店」",
   "　例如「行程 : 7/10 出差台中」(全天,@地點可省略)",
-  "查看:今天行程 / 明天行程 / 本週行程",
+  "查看:今天行程 / 明天行程 / 本週行程 / 本月行程 / 下月行程",
   "改期:改行程 2 明天 15:00(先查行程看編號)",
   "刪除:刪行程 2"
 ].join("\n");
@@ -189,6 +189,14 @@ async function processLineCommand(text, env) {
   }
   if (/^(明日|明天)行程$/.test(t)) {
     try { return await gcalListRange(1, 2, "明天", env); }
+    catch (e) { return "❌ 查詢行程失敗:" + e.message; }
+  }
+  if (/^(本月|這個月|當月)行程$/.test(t)) {
+    try { return await gcalListMonth(0, env); }
+    catch (e) { return "❌ 查詢行程失敗:" + e.message; }
+  }
+  if (/^(下月|下個月)行程$/.test(t)) {
+    try { return await gcalListMonth(1, env); }
     catch (e) { return "❌ 查詢行程失敗:" + e.message; }
   }
   if (/^(本週|本周|一週|一周|近期)?行程$/.test(t)) {
@@ -400,12 +408,27 @@ async function gcalAdd(text, env) {
 }
 
 async function gcalListRange(fromDays, toDays, label, env) {
-  const token = await googleAccessToken(env);
   const a = twDateParts(fromDays), b = twDateParts(toDays);
   const timeMin = a.y + "-" + pad2(a.m) + "-" + pad2(a.d) + "T00:00:00+08:00";
   const timeMax = b.y + "-" + pad2(b.m) + "-" + pad2(b.d) + "T00:00:00+08:00";
+  return gcalListBetween(timeMin, timeMax, label, env);
+}
+
+async function gcalListMonth(offsetMonths, env) {
+  const p = twDateParts(0);
+  let y = p.y, m = p.m + (offsetMonths || 0);
+  while (m > 12) { m -= 12; y++; }
+  let y2 = y, m2 = m + 1;
+  if (m2 > 12) { m2 = 1; y2++; }
+  const timeMin = y + "-" + pad2(m) + "-01T00:00:00+08:00";
+  const timeMax = y2 + "-" + pad2(m2) + "-01T00:00:00+08:00";
+  return gcalListBetween(timeMin, timeMax, m + " 月", env);
+}
+
+async function gcalListBetween(timeMin, timeMax, label, env) {
+  const token = await googleAccessToken(env);
   const url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(env.GOOGLE_CALENDAR_ID) + "/events" +
-    "?singleEvents=true&orderBy=startTime&maxResults=50" +
+    "?singleEvents=true&orderBy=startTime&maxResults=100" +
     "&timeMin=" + encodeURIComponent(timeMin) + "&timeMax=" + encodeURIComponent(timeMax);
   const res = await fetch(url, { headers: { "authorization": "Bearer " + token } });
   const j = await res.json();
