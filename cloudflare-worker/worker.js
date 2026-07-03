@@ -6,16 +6,22 @@
  *   - 環境變數/密鑰:  APP_PASSWORD               (dashboard 登入密碼)
  *   - 環境變數/密鑰:  LINE_CHANNEL_SECRET        (LINE channel secret,驗證訊息來源)
  *   - 環境變數/密鑰:  LINE_CHANNEL_ACCESS_TOKEN  (LINE channel access token,回覆訊息用)
+ *   - 環境變數/密鑰:  GOOGLE_SA_KEY              (Google 服務帳戶的 JSON 金鑰「整份內容」)
+ *   - 環境變數/密鑰:  GOOGLE_CALENDAR_ID         (你的行事曆 ID,通常就是你的 Gmail 地址)
  *
  * 路由:
  *   GET  /       -> 回傳 dashboard 網頁
  *   POST /api    -> {action:'list'|'add'|'complete'|'reopen'|'delete', ...}  (需帶 x-app-password)
  *   POST /line   -> LINE Messaging API webhook
  *
- * LINE 指令:
+ * LINE 指令(待辦):
  *   待辦 : 內容      -> 新增待辦(冒號全形半形皆可)
  *   待辦事項         -> 列出待辦清單
  *   完成 2           -> 完成清單上第 2 筆
+ * LINE 指令(行事曆):
+ *   行程 : 明天 14:00 拜訪宏益   -> 建立 Google 日曆活動(1 小時)
+ *   行程 : 7/10 出差台中         -> 全天活動
+ *   今天行程 / 明天行程 / 本週行程 -> 查詢行程
  *   其他文字         -> 回覆使用說明
  */
 
@@ -153,19 +159,40 @@ function sortActive(tasks) {
 const LINE_HELP = [
   "你可以這樣使用 📝",
   "",
-  "新增待辦:",
-  "　待辦 : 內容",
+  "── 待辦(提醒事項)──",
+  "新增:待辦 : 內容",
   "　例如「待辦 : 回覆宏益報價」",
+  "查看:待辦事項",
+  "完成:完成 2　(第 2 筆)",
   "",
-  "查看清單:",
-  "　待辦事項",
-  "",
-  "完成任務:",
-  "　完成 2　(完成清單上第 2 筆)"
+  "── 行程(Google 日曆)──",
+  "新增:行程 : 日期 時間 內容",
+  "　例如「行程 : 明天 14:00 拜訪宏益」",
+  "　例如「行程 : 7/10 出差台中」(全天)",
+  "查看:今天行程 / 明天行程 / 本週行程"
 ].join("\n");
 
 async function processLineCommand(text, env) {
   const t = String(text || "").trim();
+
+  /* ---- 行事曆指令(Google Calendar) ---- */
+  let g = t.match(/^行程\s*[:：]\s*(.+)$/s);
+  if (g) {
+    try { return await gcalAdd(g[1], env); }
+    catch (e) { return "❌ 建立行程失敗:" + e.message; }
+  }
+  if (/^(今日|今天)行程$/.test(t)) {
+    try { return await gcalListRange(0, 1, "今天", env); }
+    catch (e) { return "❌ 查詢行程失敗:" + e.message; }
+  }
+  if (/^(明日|明天)行程$/.test(t)) {
+    try { return await gcalListRange(1, 2, "明天", env); }
+    catch (e) { return "❌ 查詢行程失敗:" + e.message; }
+  }
+  if (/^(本週|本周|一週|一周|近期)?行程$/.test(t)) {
+    try { return await gcalListRange(0, 7, "未來 7 天", env); }
+    catch (e) { return "❌ 查詢行程失敗:" + e.message; }
+  }
 
   let tasks = (await env.TODO_KV.get("todos", "json")) || [];
   if (!Array.isArray(tasks)) tasks = [];
@@ -216,6 +243,161 @@ async function processLineCommand(text, env) {
   }
 
   return LINE_HELP;
+}
+
+/* ---------------- Google Calendar ---------------- */
+
+const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
+const pad2 = n => (n < 10 ? "0" : "") + n;
+
+/* 台灣時區 (UTC+8) 往後 offsetDays 天的年月日 */
+function twDateParts(offsetDays) {
+  const d = new Date(Date.now() + (8 * 3600 + (offsetDays || 0) * 86400) * 1000);
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), w: d.getUTCDay() };
+}
+
+function b64url(str) { return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function b64urlBytes(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return b64url(bin);
+}
+
+async function googleAccessToken(env) {
+  if (!env.GOOGLE_SA_KEY || !env.GOOGLE_CALENDAR_ID) {
+    throw new Error("行事曆尚未設定(缺 GOOGLE_SA_KEY 或 GOOGLE_CALENDAR_ID)");
+  }
+  const cached = await env.TODO_KV.get("gcal_token", "json");
+  if (cached && cached.exp > Math.floor(Date.now() / 1000) + 60) return cached.token;
+
+  let sa;
+  try { sa = JSON.parse(env.GOOGLE_SA_KEY); } catch (e) { throw new Error("GOOGLE_SA_KEY 不是有效的 JSON,請貼上金鑰檔的完整內容"); }
+
+  const now = Math.floor(Date.now() / 1000);
+  const input = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." + b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/calendar",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now, exp: now + 3600
+  }));
+
+  const pem = String(sa.private_key || "").replace(/\\n/g, "\n")
+    .replace(/-----BEGIN PRIVATE KEY-----/, "").replace(/-----END PRIVATE KEY-----/, "").replace(/\s/g, "");
+  const raw = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8", raw, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign({ name: "RSASSA-PKCS1-v1_5" }, key, new TextEncoder().encode(input));
+  const jwt = input + "." + b64urlBytes(new Uint8Array(sig));
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "grant_type=" + encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer") + "&assertion=" + jwt
+  });
+  const j = await res.json();
+  if (!j.access_token) throw new Error("Google 授權失敗:" + (j.error_description || j.error || res.status));
+  await env.TODO_KV.put("gcal_token", JSON.stringify({ token: j.access_token, exp: now + 3500 }), { expirationTtl: 3500 });
+  return j.access_token;
+}
+
+/* 解析「日期 [時間] 內容」,支援 今天/明天/後天、7/10、2026/7/10、14:00、下午2點、2點半 */
+function parseSchedule(text) {
+  let rest = String(text || "").trim();
+  let y, mo, da;
+
+  let m = rest.match(/^(今天|明天|後天)\s*/);
+  if (m) {
+    const off = m[1] === "今天" ? 0 : m[1] === "明天" ? 1 : 2;
+    const p = twDateParts(off); y = p.y; mo = p.m; da = p.d;
+    rest = rest.slice(m[0].length);
+  } else if ((m = rest.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s*/))) {
+    y = +m[1]; mo = +m[2]; da = +m[3]; rest = rest.slice(m[0].length);
+  } else if ((m = rest.match(/^(\d{1,2})[\/\-](\d{1,2})\s*/))) {
+    const p = twDateParts(0); y = p.y; mo = +m[1]; da = +m[2]; rest = rest.slice(m[0].length);
+  } else {
+    return null;
+  }
+
+  let hh = null, mm = 0;
+  const fixAmPm = (prefix, h) => {
+    if ((prefix === "下午" || prefix === "晚上") && h < 12) return h + 12;
+    return h;
+  };
+  if ((m = rest.match(/^(上午|早上|中午|下午|晚上)?\s*(\d{1,2})[::](\d{2})\s*/))) {
+    hh = fixAmPm(m[1], +m[2]); mm = +m[3]; rest = rest.slice(m[0].length);
+  } else if ((m = rest.match(/^(上午|早上|中午|下午|晚上)?\s*(\d{1,2})\s*點\s*(半)?\s*/))) {
+    hh = fixAmPm(m[1], +m[2]); mm = m[3] ? 30 : 0; rest = rest.slice(m[0].length);
+  }
+
+  const title = rest.trim();
+  if (!title) return null;
+  return { y: y, mo: mo, da: da, hh: hh, mm: mm, title: title };
+}
+
+async function gcalAdd(text, env) {
+  const p = parseSchedule(text);
+  if (!p) {
+    return "格式看不懂 😅 請用:\n行程 : 日期 時間 內容\n例如「行程 : 明天 14:00 拜訪宏益」\n或「行程 : 7/10 出差台中」(全天)";
+  }
+  const token = await googleAccessToken(env);
+  const dateStr = p.y + "-" + pad2(p.mo) + "-" + pad2(p.da);
+  const ev = { summary: p.title };
+  let whenText;
+  if (p.hh === null) {
+    const next = new Date(Date.UTC(p.y, p.mo - 1, p.da) + 86400000);
+    ev.start = { date: dateStr };
+    ev.end = { date: next.getUTCFullYear() + "-" + pad2(next.getUTCMonth() + 1) + "-" + pad2(next.getUTCDate()) };
+    whenText = p.mo + "/" + p.da + " 全天";
+  } else {
+    const endH = p.hh + 1;
+    ev.start = { dateTime: dateStr + "T" + pad2(p.hh) + ":" + pad2(p.mm) + ":00+08:00", timeZone: "Asia/Taipei" };
+    ev.end = { dateTime: dateStr + "T" + pad2(Math.min(endH, 23)) + ":" + pad2(endH > 23 ? 59 : p.mm) + ":00+08:00", timeZone: "Asia/Taipei" };
+    whenText = p.mo + "/" + p.da + " " + pad2(p.hh) + ":" + pad2(p.mm);
+  }
+  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(env.GOOGLE_CALENDAR_ID) + "/events", {
+    method: "POST",
+    headers: { "content-type": "application/json", "authorization": "Bearer " + token },
+    body: JSON.stringify(ev)
+  });
+  const j = await res.json();
+  if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
+  return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText;
+}
+
+async function gcalListRange(fromDays, toDays, label, env) {
+  const token = await googleAccessToken(env);
+  const a = twDateParts(fromDays), b = twDateParts(toDays);
+  const timeMin = a.y + "-" + pad2(a.m) + "-" + pad2(a.d) + "T00:00:00+08:00";
+  const timeMax = b.y + "-" + pad2(b.m) + "-" + pad2(b.d) + "T00:00:00+08:00";
+  const url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(env.GOOGLE_CALENDAR_ID) + "/events" +
+    "?singleEvents=true&orderBy=startTime&maxResults=50" +
+    "&timeMin=" + encodeURIComponent(timeMin) + "&timeMax=" + encodeURIComponent(timeMax);
+  const res = await fetch(url, { headers: { "authorization": "Bearer " + token } });
+  const j = await res.json();
+  if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
+  const items = j.items || [];
+  if (!items.length) return "📅 " + label + "沒有安排行程,好好休息 😌";
+
+  const lines = [];
+  let lastDate = "";
+  for (const ev of items) {
+    let dateKey, timeText;
+    if (ev.start && ev.start.dateTime) {
+      const s = ev.start.dateTime;                       // e.g. 2026-07-03T14:00:00+08:00
+      dateKey = s.slice(0, 10);
+      timeText = s.slice(11, 16);
+    } else if (ev.start && ev.start.date) {
+      dateKey = ev.start.date;
+      timeText = "全天";
+    } else { continue; }
+    if (dateKey !== lastDate) {
+      const dd = dateKey.split("-");
+      const wd = new Date(Date.UTC(+dd[0], +dd[1] - 1, +dd[2])).getUTCDay();
+      lines.push((lines.length ? "\n" : "") + "▍" + (+dd[1]) + "/" + (+dd[2]) + "(" + WEEKDAY[wd] + ")");
+      lastDate = dateKey;
+    }
+    lines.push("• " + timeText + "　" + (ev.summary || "(未命名)"));
+  }
+  return "📅 " + label + "的行程\n\n" + lines.join("\n");
 }
 
 const HTML = `<!DOCTYPE html>
