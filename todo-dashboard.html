@@ -4,150 +4,120 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#f9f9f7">
-<title>Todo Dashboard · Todoist</title>
+<title>我的 Todo Dashboard</title>
 <style>
   :root {
-    --surface-1:      #fcfcfb;
-    --page:           #f9f9f7;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #898781;
-    --gridline:       #e1e0d9;
-    --baseline:       #c3c2b7;
-    --border:         rgba(11,11,11,0.10);
-    --series-1:       #2a78d6;
-    --series-2:       #1baf7a;
-    --status-good:    #0ca30c;
-    --status-warning: #fab219;
-    --status-serious: #ec835a;
-    --status-critical:#d03b3b;
-    --shadow:         0 1px 2px rgba(11,11,11,0.04), 0 4px 16px rgba(11,11,11,0.05);
-    --field-bg:       #ffffff;
+    --surface-1:#fcfcfb; --page:#f9f9f7; --text-primary:#0b0b0b; --text-secondary:#52514e;
+    --text-muted:#898781; --gridline:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --series-1:#2a78d6; --series-2:#1baf7a; --status-good:#0ca30c; --status-warning:#fab219;
+    --status-critical:#d03b3b; --shadow:0 1px 2px rgba(11,11,11,0.04),0 4px 16px rgba(11,11,11,0.05); --field-bg:#fff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --surface-1:      #1a1a19;
-      --page:           #0d0d0d;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --gridline:       #2c2c2a;
-      --baseline:       #383835;
-      --border:         rgba(255,255,255,0.10);
-      --series-1:       #3987e5;
-      --series-2:       #199e70;
-      --status-good:    #0ca30c;
-      --status-warning: #fab219;
-      --status-serious: #ec835a;
-      --status-critical:#d03b3b;
-      --shadow:         0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.4);
-      --field-bg:       #222220;
+      --surface-1:#1a1a19; --page:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+      --text-muted:#898781; --gridline:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,0.10);
+      --series-1:#3987e5; --series-2:#199e70; --status-good:#0ca30c; --status-warning:#fab219;
+      --status-critical:#d03b3b; --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.4); --field-bg:#222220;
     }
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    background: var(--page);
-    color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
-    -webkit-font-smoothing: antialiased;
-    line-height: 1.5;
-  }
-  .wrap { max-width: 920px; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 18px 64px; }
-  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
-  h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0; }
-  .icon-btn {
-    flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--surface-1); color: var(--text-secondary); font-size: 18px; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-  }
-  .icon-btn:active { transform: scale(0.96); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--page); color:var(--text-primary);
+    font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif; -webkit-font-smoothing:antialiased; line-height:1.5; }
+  .wrap { max-width:920px; margin:0 auto; padding:max(24px,env(safe-area-inset-top)) 18px 64px; }
+  header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:24px; }
+  h1 { font-size:24px; font-weight:700; margin:0 0 4px; letter-spacing:-.01em; }
+  .subtitle { color:var(--text-secondary); font-size:13px; margin:0; }
+  .icon-btn { flex:none; width:40px; height:40px; border-radius:10px; border:1px solid var(--border);
+    background:var(--surface-1); color:var(--text-secondary); font-size:18px; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; }
+  .icon-btn:active { transform:scale(.96); }
 
-  /* stat tiles */
-  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
-  .tile .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
-  .tile .value { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+  .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+  .tile { background:var(--surface-1); border:1px solid var(--border); border-radius:14px; padding:16px 18px; box-shadow:var(--shadow); }
+  .tile .label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+  .tile .value { font-size:30px; font-weight:700; line-height:1; letter-spacing:-.02em; }
   .tile .value.good{color:var(--status-good)} .tile .value.warning{color:var(--status-warning)} .tile .value.critical{color:var(--status-critical)}
-  .tile .foot { font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+  .tile .foot { font-size:12px; color:var(--text-secondary); margin-top:8px; }
 
-  /* panels */
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
-  .panel h2 { font-size: 13px; font-weight: 600; margin: 0 0 16px; color: var(--text-secondary); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px; }
+  .panel { background:var(--surface-1); border:1px solid var(--border); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); }
+  .panel h2 { font-size:13px; font-weight:600; margin:0 0 16px; color:var(--text-secondary); }
 
-  /* bars */
-  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; }
-  .bar-row:last-child { margin-bottom: 0; }
-  .bar-key { display: flex; align-items: center; gap: 8px; width: 84px; flex: none; font-size: 13px; }
-  .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-  .bar-track { flex: 1; height: 12px; background: var(--gridline); border-radius: 6px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 6px; transition: width .4s ease; }
-  .bar-val { width: 22px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-secondary); flex: none; }
-  .empty-note { color: var(--text-muted); font-size: 13px; }
+  .bar-row { display:flex; align-items:center; gap:12px; margin-bottom:13px; }
+  .bar-row:last-child { margin-bottom:0; }
+  .bar-key { display:flex; align-items:center; gap:8px; width:84px; flex:none; font-size:13px; }
+  .swatch { width:10px; height:10px; border-radius:3px; flex:none; }
+  .bar-track { flex:1; height:12px; background:var(--gridline); border-radius:6px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:6px; transition:width .4s ease; }
+  .bar-val { width:22px; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; color:var(--text-secondary); flex:none; }
+  .empty-note { color:var(--text-muted); font-size:13px; }
 
-  /* add form */
-  .add-form { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .add-form input[type=text] {
-    flex: 1 1 200px; min-width: 0; padding: 11px 14px; font-size: 15px; border-radius: 10px;
-    border: 1px solid var(--border); background: var(--field-bg); color: var(--text-primary);
-  }
-  .add-form select {
-    padding: 11px 12px; font-size: 14px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--field-bg); color: var(--text-primary); flex: none;
-  }
-  input:focus, select:focus, button:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
-  .btn {
-    padding: 11px 18px; font-size: 15px; font-weight: 600; border-radius: 10px; border: none; cursor: pointer;
-    background: var(--series-1); color: #fff; flex: none;
-  }
-  .btn:active { transform: scale(0.98); }
-  .btn.ghost { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border); }
-  .btn:disabled { opacity: .5; cursor: default; }
+  .ring-wrap { display:flex; align-items:center; gap:18px; }
+  .ring { position:relative; width:104px; height:104px; flex:none; }
+  .ring svg { transform:rotate(-90deg); }
+  .ring .center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring .center .pct { font-size:23px; font-weight:700; line-height:1; }
+  .ring .center .cap { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .ring-legend { font-size:13px; color:var(--text-secondary); }
+  .ring-legend div { margin-bottom:6px; display:flex; align-items:center; gap:8px; }
 
-  /* task list */
-  .task { display: flex; align-items: center; gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--gridline); }
-  .task:last-child { border-bottom: none; }
-  .task.done-anim { opacity: 0; transform: translateX(8px); transition: all .35s ease; }
-  .check {
-    flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--baseline);
-    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-    color: transparent; font-size: 14px; transition: all .15s;
-  }
-  .check.p1 { border-color: var(--status-critical); }
-  .check.p2 { border-color: var(--status-warning); }
-  .check.p3 { border-color: var(--series-1); }
-  .check:active { transform: scale(0.9); }
-  .check:hover { background: var(--status-good); border-color: var(--status-good); color: #fff; }
-  .task-main { flex: 1; min-width: 0; }
-  .task-name { font-size: 15px; font-weight: 500; word-break: break-word; }
-  .task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); }
-  .pill .dot { width: 7px; height: 7px; border-radius: 999px; flex: none; }
+  .add-form { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .add-form input[type=text] { flex:1 1 200px; min-width:0; padding:11px 14px; font-size:15px; border-radius:10px;
+    border:1px solid var(--border); background:var(--field-bg); color:var(--text-primary); }
+  .add-form input[type=date], .add-form select { padding:11px 12px; font-size:14px; border-radius:10px;
+    border:1px solid var(--border); background:var(--field-bg); color:var(--text-primary); flex:none; }
+  input:focus, select:focus, button:focus { outline:2px solid var(--series-1); outline-offset:1px; }
+  .btn { padding:11px 18px; font-size:15px; font-weight:600; border-radius:10px; border:none; cursor:pointer;
+    background:var(--series-1); color:#fff; flex:none; }
+  .btn:active { transform:scale(.98); }
+  .btn.ghost { background:var(--surface-1); color:var(--text-primary); border:1px solid var(--border); }
+  .btn:disabled { opacity:.5; cursor:default; }
 
-  /* setup / status screens */
-  .center-card { max-width: 480px; margin: 8vh auto 0; }
-  .setup { background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 28px 26px; box-shadow: var(--shadow); }
-  .setup h1 { font-size: 22px; margin-bottom: 8px; }
-  .setup p { color: var(--text-secondary); font-size: 14px; margin: 0 0 14px; }
-  .setup ol { color: var(--text-secondary); font-size: 14px; padding-left: 20px; margin: 0 0 16px; }
-  .setup ol li { margin-bottom: 6px; }
-  .setup a { color: var(--series-1); }
-  .setup input { width: 100%; padding: 12px 14px; font-size: 15px; border-radius: 10px; border: 1px solid var(--border); background: var(--field-bg); color: var(--text-primary); margin-bottom: 12px; }
-  .msg { font-size: 13px; margin-top: 12px; padding: 10px 12px; border-radius: 8px; }
-  .msg.err { background: rgba(208,59,59,.10); color: var(--status-critical); }
-  .msg.ok  { background: rgba(12,163,12,.10); color: var(--status-good); }
-  .hint { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
-  .loading { text-align: center; color: var(--text-muted); padding: 60px 0; font-size: 15px; }
-  footer { margin-top: 26px; font-size: 12px; color: var(--text-muted); text-align: center; }
-  footer a { color: var(--text-muted); }
+  .task { display:flex; align-items:center; gap:12px; padding:14px 4px; border-bottom:1px solid var(--gridline); }
+  .task:last-child { border-bottom:none; }
+  .task.removing { opacity:0; transform:translateX(8px); transition:all .3s ease; }
+  .check { flex:none; width:24px; height:24px; border-radius:50%; border:2px solid var(--baseline);
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:transparent;
+    font-size:14px; transition:all .15s; background:transparent; }
+  .check.p1{border-color:var(--status-critical)} .check.p2{border-color:var(--status-warning)} .check.p3{border-color:var(--series-1)}
+  .check:hover { background:var(--status-good); border-color:var(--status-good); color:#fff; }
+  .check:active { transform:scale(.9); }
+  .check.done { background:var(--status-good); border-color:var(--status-good); color:#fff; }
+  .task-main { flex:1; min-width:0; }
+  .task-name { font-size:15px; font-weight:500; word-break:break-word; }
+  .task.completed .task-name { text-decoration:line-through; color:var(--text-muted); }
+  .task-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:2px 9px; border-radius:999px; border:1px solid var(--border); color:var(--text-secondary); }
+  .pill .dot { width:7px; height:7px; border-radius:999px; flex:none; }
+  .del { flex:none; margin-left:auto; background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; padding:4px 8px; border-radius:8px; }
+  .del:hover { color:var(--status-critical); background:rgba(208,59,59,.08); }
+  .section-toggle { background:none; border:none; color:var(--text-secondary); font-size:13px; font-weight:600; cursor:pointer; padding:0; margin-top:6px; }
 
-  @media (max-width: 680px) {
-    .tiles { grid-template-columns: repeat(2, 1fr); }
-    .grid2 { grid-template-columns: 1fr; }
-    h1 { font-size: 21px; }
+  .center-card { max-width:520px; margin:6vh auto 0; }
+  .setup { background:var(--surface-1); border:1px solid var(--border); border-radius:16px; padding:26px 24px; box-shadow:var(--shadow); }
+  .setup h1 { font-size:21px; margin-bottom:8px; }
+  .setup p { color:var(--text-secondary); font-size:14px; margin:0 0 12px; }
+  .setup ol { color:var(--text-secondary); font-size:13.5px; padding-left:20px; margin:0 0 16px; }
+  .setup ol li { margin-bottom:7px; }
+  .setup a { color:var(--series-1); }
+  .setup label { display:block; font-size:12px; color:var(--text-muted); margin:10px 0 4px; }
+  .setup input { width:100%; padding:11px 13px; font-size:15px; border-radius:10px; border:1px solid var(--border); background:var(--field-bg); color:var(--text-primary); }
+  .row2 { display:flex; gap:10px; }
+  .row2 > div { flex:1; }
+  .msg { font-size:13px; margin-top:12px; padding:10px 12px; border-radius:8px; }
+  .msg.err { background:rgba(208,59,59,.10); color:var(--status-critical); }
+  .msg.ok { background:rgba(12,163,12,.10); color:var(--status-good); }
+  .hint { font-size:12px; color:var(--text-muted); margin-top:10px; }
+  .loading { text-align:center; color:var(--text-muted); padding:60px 0; font-size:15px; }
+  footer { margin-top:26px; font-size:12px; color:var(--text-muted); text-align:center; }
+  footer a { color:var(--text-muted); cursor:pointer; }
+  .saving-tag { font-size:12px; color:var(--text-muted); margin-left:8px; }
+
+  @media (max-width:680px) {
+    .tiles { grid-template-columns:repeat(2,1fr); }
+    .grid2 { grid-template-columns:1fr; }
+    h1 { font-size:21px; }
   }
 </style>
 </head>
@@ -156,241 +126,246 @@
 
 <script>
 "use strict";
-const API = "https://api.todoist.com/rest/v2";
-const TOKEN_KEY = "todoist_token";
+const GH = "https://api.github.com";
+const PATH = "todos.json";
+const CFG_KEY = "gh_todo_cfg";
 const app = document.getElementById("app");
-let tasks = [];
-let sessionDone = 0;
 
-// ---------- helpers ----------
+let cfg = null;          // {owner, repo, token}
+let state = { tasks: [] };
+let fileSha = null;      // sha of todos.json for updates
+let busy = false;
+
+// ---------- utils ----------
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const token = () => localStorage.getItem(TOKEN_KEY);
-const todayStr = () => { const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const b64encode = s => btoa(unescape(encodeURIComponent(s)));
+const b64decode = b => decodeURIComponent(escape(atob(String(b).replace(/\s/g,''))));
+const uid = () => (Date.now().toString(36) + Math.random().toString(36).slice(2,7));
+const todayStr = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+function loadCfg(){ try { return JSON.parse(localStorage.getItem(CFG_KEY)); } catch { return null; } }
+function saveCfg(c){ localStorage.setItem(CFG_KEY, JSON.stringify(c)); }
 
-async function api(path, opts = {}) {
-  const res = await fetch(API + path, {
+async function gh(path, opts = {}) {
+  const res = await fetch(GH + path, {
     ...opts,
-    headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/json", ...(opts.headers||{}) },
+    headers: { "Authorization":"Bearer "+cfg.token, "Accept":"application/vnd.github+json",
+               "X-GitHub-Api-Version":"2022-11-28", ...(opts.headers||{}) },
   });
-  if (res.status === 401 || res.status === 403) { const e = new Error("unauthorized"); e.auth = true; throw e; }
-  if (!res.ok) throw new Error("API " + res.status);
-  if (res.status === 204) return null;
-  const txt = await res.text();
-  return txt ? JSON.parse(txt) : null;
+  if (res.status === 401) { const e=new Error("token 無效"); e.code=401; throw e; }
+  return res;
 }
 
-// Todoist REST priority: 4=urgent(P1) … 1=normal. Map to UI.
+// ---------- data load / save ----------
+async function loadData() {
+  const res = await gh(`/repos/${cfg.owner}/${cfg.repo}/contents/${PATH}?ref=main&t=${Date.now()}`,
+                       { headers:{ "Cache-Control":"no-cache" } });
+  if (res.status === 404) { state = { tasks: [] }; fileSha = null; return; }   // file not created yet
+  if (res.status === 403) { const e=new Error("沒有存取這個 repo 的權限,請檢查 token 權限與 repo 名稱"); e.code=403; throw e; }
+  if (!res.ok) throw new Error("讀取失敗 (HTTP " + res.status + ")");
+  const j = await res.json();
+  fileSha = j.sha;
+  try { state = JSON.parse(b64decode(j.content)); } catch { state = { tasks: [] }; }
+  if (!Array.isArray(state.tasks)) state.tasks = [];
+}
+
+async function saveData(message) {
+  const body = { message: message || "update todos", content: b64encode(JSON.stringify(state, null, 2)), branch: "main" };
+  if (fileSha) body.sha = fileSha;
+  let res = await gh(`/repos/${cfg.owner}/${cfg.repo}/contents/${PATH}`, { method:"PUT", body: JSON.stringify(body) });
+  if (res.status === 409) {           // sha conflict — reload latest then retry once
+    await loadData();
+    body.sha = fileSha || undefined;
+    res = await gh(`/repos/${cfg.owner}/${cfg.repo}/contents/${PATH}`, { method:"PUT", body: JSON.stringify(body) });
+  }
+  if (res.status === 404) { const e=new Error("找不到 repo「"+cfg.owner+"/"+cfg.repo+"」,請確認名稱是否正確、且 token 有權限"); e.code=404; throw e; }
+  if (!res.ok) throw new Error("儲存失敗 (HTTP " + res.status + ")");
+  const j = await res.json();
+  fileSha = j.content && j.content.sha ? j.content.sha : fileSha;
+}
+
+// ---------- priority / due helpers ----------
 const PRIO = {
-  4: { label: "P1 · 緊急", cls: "p1", color: "var(--status-critical)" },
-  3: { label: "P2 · 高",   cls: "p2", color: "var(--status-warning)"  },
-  2: { label: "P3 · 中",   cls: "p3", color: "var(--series-1)"        },
-  1: { label: "一般",      cls: "",   color: "var(--baseline)"        },
+  4:{label:"P1 · 緊急",cls:"p1",color:"var(--status-critical)"},
+  3:{label:"P2 · 高",cls:"p2",color:"var(--status-warning)"},
+  2:{label:"P3 · 中",cls:"p3",color:"var(--series-1)"},
+  1:{label:"一般",cls:"",color:"var(--baseline)"},
 };
-function dueStatus(t) {
-  if (!t.due || !t.due.date) return "none";
-  const d = t.due.date.slice(0,10), today = todayStr();
-  if (d < today) return "overdue";
-  if (d === today) return "today";
-  return "upcoming";
-}
+function dueStatus(t){ if(!t.due) return "none"; const today=todayStr(); if(t.due<today) return "overdue"; if(t.due===today) return "today"; return "upcoming"; }
 
-// ---------- screens ----------
+// ---------- setup screen ----------
 function renderSetup(message) {
+  const c = cfg || { owner:"kaihung0530", repo:"my-todos", token:"" };
   app.innerHTML = `
-    <div class="center-card"><div class="setup">
-      <h1>連結你的 Todoist</h1>
-      <p>這個 dashboard 會直接與你的 Todoist 同步。請貼上你的 API 金鑰(只會存在這台裝置的瀏覽器,不會上傳到任何地方)。</p>
-      <ol>
-        <li>打開 Todoist → <b>設定</b> → <b>整合 (Integrations)</b> → <b>開發者 (Developer)</b></li>
-        <li>複製「<b>API token</b>」那一串文字</li>
-        <li>貼到下面 → 按「連結」</li>
-      </ol>
-      <input id="tok" type="password" placeholder="貼上 Todoist API token" autocomplete="off" spellcheck="false">
-      <button class="btn" id="save" style="width:100%">連結</button>
-      ${message ? `<div class="msg err">${esc(message)}</div>` : ""}
-      <div class="hint">金鑰儲存在瀏覽器的 localStorage,只在此裝置有效。想清除可按右上角齒輪。</div>
-    </div></div>`;
-  const inp = document.getElementById("tok");
-  const save = () => { const v = inp.value.trim(); if (!v) return; localStorage.setItem(TOKEN_KEY, v); load(); };
-  document.getElementById("save").onclick = save;
-  inp.addEventListener("keydown", e => { if (e.key === "Enter") save(); });
-  inp.focus();
+  <div class="center-card"><div class="setup">
+    <h1>設定你的 Todo(資料存 GitHub)</h1>
+    <p>這個 app 會把你的任務存在你自己的 <b>私人 GitHub repo</b>,只有你看得到。第一次需要三個資料:</p>
+    <ol>
+      <li>建一個 <b>私人 repo</b>(在 <a href="https://github.com/new" target="_blank">github.com/new</a>,名稱例如 <code>my-todos</code>,選 <b>Private</b>,勾 <b>Add a README</b> 後建立)</li>
+      <li>建一把 <b>token</b>:<a href="https://github.com/settings/personal-access-tokens/new" target="_blank">Fine-grained token</a> → Repository access 選你剛建的 repo → Permissions 把 <b>Contents</b> 設為 <b>Read and write</b> → 產生後複製</li>
+      <li>把資料填到下面 → 按「連結」</li>
+    </ol>
+    <div class="row2">
+      <div><label>你的 GitHub 帳號</label><input id="c-owner" value="${esc(c.owner)}" autocomplete="off" spellcheck="false"></div>
+      <div><label>私人 repo 名稱</label><input id="c-repo" value="${esc(c.repo)}" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <label>GitHub token</label>
+    <input id="c-token" type="password" value="${esc(c.token)}" placeholder="貼上 fine-grained token" autocomplete="off" spellcheck="false">
+    <div style="margin-top:14px"><button class="btn" id="c-save" style="width:100%">連結</button></div>
+    ${message ? `<div class="msg err">${esc(message)}</div>` : ""}
+    <div class="hint">帳號/repo/token 只存在這台裝置的瀏覽器,不會上傳到任何地方。手機也照這三步各設定一次即可。</div>
+  </div></div>`;
+  document.getElementById("c-save").onclick = async () => {
+    const owner=document.getElementById("c-owner").value.trim();
+    const repo=document.getElementById("c-repo").value.trim();
+    const token=document.getElementById("c-token").value.trim();
+    if(!owner||!repo||!token){ renderSetup("三個欄位都要填喔。"); return; }
+    cfg={owner,repo,token}; saveCfg(cfg); load();
+  };
 }
 
-function computeStats() {
-  const s = { total: tasks.length, today: 0, overdue: 0, high: 0 };
-  tasks.forEach(t => {
-    const st = dueStatus(t);
-    if (st === "today") s.today++;
-    if (st === "overdue") s.overdue++;
-    if (t.priority >= 3) s.high++;
-  });
+// ---------- dashboard ----------
+function computeStats(active){
+  const s={total:active.length,today:0,overdue:0,high:0};
+  active.forEach(t=>{ const st=dueStatus(t); if(st==="today")s.today++; if(st==="overdue")s.overdue++; if(t.priority>=3)s.high++; });
   return s;
 }
 
-function renderDashboard() {
-  const s = computeStats();
-  const tiles = [
-    { label: "待完成",  value: s.total,   cls: "",                         foot: sessionDone ? `本次已完成 ${sessionDone}` : "目前活躍任務" },
-    { label: "今日到期", value: s.today,   cls: s.today ? "warning" : "",   foot: s.today ? "今天要處理" : "今天沒有到期" },
-    { label: "已逾期",  value: s.overdue, cls: s.overdue ? "critical":"good", foot: s.overdue ? "已過期限" : "沒有逾期" },
-    { label: "高優先",  value: s.high,    cls: s.high ? "warning" : "",    foot: "P1 / P2 任務" },
+function renderDashboard(savingMsg) {
+  const active = state.tasks.filter(t=>!t.done);
+  const completed = state.tasks.filter(t=>t.done);
+  const s = computeStats(active);
+  const pctDone = state.tasks.length ? Math.round(completed.length/state.tasks.length*100) : 0;
+
+  const tiles=[
+    {label:"待完成",value:s.total,cls:"",foot:"目前活躍任務"},
+    {label:"今日到期",value:s.today,cls:s.today?"warning":"",foot:s.today?"今天要處理":"今天沒有到期"},
+    {label:"已逾期",value:s.overdue,cls:s.overdue?"critical":"good",foot:s.overdue?"已過期限":"沒有逾期"},
+    {label:"已完成",value:completed.length,cls:"good",foot:pctDone+"% 完成率"},
   ];
-  const tilesHtml = tiles.map(t => `
-    <div class="tile"><div class="label">${t.label}</div><div class="value ${t.cls}">${t.value}</div><div class="foot">${t.foot}</div></div>`).join("");
+  const tilesHtml=tiles.map(t=>`<div class="tile"><div class="label">${t.label}</div><div class="value ${t.cls}">${t.value}</div><div class="foot">${t.foot}</div></div>`).join("");
 
-  // priority breakdown
-  const pc = {4:0,3:0,2:0,1:0}; tasks.forEach(t => pc[t.priority] = (pc[t.priority]||0)+1);
-  const maxP = Math.max(1, ...Object.values(pc));
-  const prioBars = [4,3,2,1].map(p => `
-    <div class="bar-row">
-      <div class="bar-key"><span class="swatch" style="background:${PRIO[p].color}"></span>${PRIO[p].label.split(" · ")[0]}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pc[p]/maxP*100}%;background:${PRIO[p].color}"></div></div>
-      <div class="bar-val">${pc[p]}</div>
-    </div>`).join("");
+  const pc={4:0,3:0,2:0,1:0}; active.forEach(t=>pc[t.priority]=(pc[t.priority]||0)+1);
+  const maxP=Math.max(1,...Object.values(pc));
+  const prioBars=[4,3,2,1].map(p=>`
+    <div class="bar-row"><div class="bar-key"><span class="swatch" style="background:${PRIO[p].color}"></span>${PRIO[p].label.split(" · ")[0]}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${pc[p]/maxP*100}%;background:${PRIO[p].color}"></div></div>
+    <div class="bar-val">${pc[p]}</div></div>`).join("");
 
-  // due breakdown
-  const dc = { overdue:0, today:0, upcoming:0, none:0 }; tasks.forEach(t => dc[dueStatus(t)]++);
-  const maxD = Math.max(1, ...Object.values(dc));
-  const dueMeta = [
-    ["overdue","已逾期","var(--status-critical)"],
-    ["today","今日","var(--status-warning)"],
-    ["upcoming","未來","var(--series-1)"],
-    ["none","無日期","var(--baseline)"],
-  ];
-  const dueBars = dueMeta.map(([k,lbl,col]) => `
-    <div class="bar-row">
-      <div class="bar-key"><span class="swatch" style="background:${col}"></span>${lbl}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${dc[k]/maxD*100}%;background:${col}"></div></div>
-      <div class="bar-val">${dc[k]}</div>
-    </div>`).join("");
+  const R=44,C=2*Math.PI*R,off=C*(1-pctDone/100);
+  const ringHtml=`<div class="ring-wrap">
+    <div class="ring"><svg width="104" height="104" viewBox="0 0 104 104">
+      <circle cx="52" cy="52" r="${R}" fill="none" stroke="var(--gridline)" stroke-width="10"/>
+      <circle cx="52" cy="52" r="${R}" fill="none" stroke="var(--status-good)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/>
+    </svg><div class="center"><div class="pct">${pctDone}%</div><div class="cap">完成</div></div></div>
+    <div class="ring-legend">
+      <div><span class="swatch" style="background:var(--status-good)"></span>已完成 ${completed.length}</div>
+      <div><span class="swatch" style="background:var(--gridline)"></span>待完成 ${active.length}</div>
+    </div></div>`;
 
-  const rowsHtml = tasks.length ? tasks.map(t => {
-    const p = PRIO[t.priority] || PRIO[1];
-    const st = dueStatus(t);
-    const dueCol = st==="overdue"?"var(--status-critical)":st==="today"?"var(--status-warning)":"var(--series-1)";
-    const dueLbl = t.due && t.due.date ? (t.due.string || t.due.date.slice(0,10)) : null;
-    return `
-    <div class="task" data-id="${t.id}">
-      <div class="check ${p.cls}" role="button" aria-label="完成" title="標記完成" data-id="${t.id}">✓</div>
+  const rank=t=>(dueStatus(t)==="overdue"?0:dueStatus(t)==="today"?1:2);
+  const sortedActive=[...active].sort((a,b)=>rank(a)-rank(b)||b.priority-a.priority||(a.createdAt||"").localeCompare(b.createdAt||""));
+
+  const activeHtml = sortedActive.length ? sortedActive.map(t=>{
+    const p=PRIO[t.priority]||PRIO[1]; const st=dueStatus(t);
+    const dueCol=st==="overdue"?"var(--status-critical)":st==="today"?"var(--status-warning)":"var(--series-1)";
+    return `<div class="task" data-id="${t.id}">
+      <div class="check ${p.cls}" role="button" title="標記完成" data-act="done" data-id="${t.id}">✓</div>
       <div class="task-main">
         <div class="task-name">${esc(t.content)}</div>
         <div class="task-meta">
           ${t.priority>1?`<span class="pill"><span class="dot" style="background:${p.color}"></span>${p.label}</span>`:""}
-          ${dueLbl?`<span class="pill"><span class="dot" style="background:${dueCol}"></span>${esc(dueLbl)}</span>`:""}
-          ${(t.labels||[]).map(l=>`<span class="pill">#${esc(l)}</span>`).join("")}
+          ${t.due?`<span class="pill"><span class="dot" style="background:${dueCol}"></span>${esc(t.due)}${st==="today"?" · 今天":st==="overdue"?" · 逾期":""}</span>`:""}
         </div>
       </div>
+      <button class="del" title="刪除" data-act="del" data-id="${t.id}">🗑</button>
     </div>`;
   }).join("") : `<div class="empty-note">🎉 沒有待辦任務,全部清空了!</div>`;
 
-  app.innerHTML = `
+  const completedHtml = completed.length ? `
+    <button class="section-toggle" id="toggleDone">已完成 (${completed.length}) ▾</button>
+    <div id="doneList" style="display:none;margin-top:8px">${
+      completed.slice().reverse().map(t=>`<div class="task completed" data-id="${t.id}">
+        <div class="check done" role="button" title="取消完成" data-act="undone" data-id="${t.id}">✓</div>
+        <div class="task-main"><div class="task-name">${esc(t.content)}</div></div>
+        <button class="del" title="刪除" data-act="del" data-id="${t.id}">🗑</button>
+      </div>`).join("")
+    }</div>` : "";
+
+  app.innerHTML=`
     <header>
-      <div>
-        <h1>Todo Dashboard</h1>
-        <p class="subtitle">Todoist · 即時同步　•　${todayStr()}</p>
-      </div>
+      <div><h1>我的 Todo Dashboard</h1><p class="subtitle">資料存於 GitHub · ${cfg.owner}/${cfg.repo}　•　${todayStr()}</p></div>
       <button class="icon-btn" id="gear" title="設定">⚙</button>
     </header>
-
     <section class="tiles">${tilesHtml}</section>
-
     <section class="grid2">
-      <div class="panel"><h2>依優先級分佈</h2>${tasks.length?prioBars:'<div class="empty-note">目前沒有任務</div>'}</div>
-      <div class="panel"><h2>依到期狀態</h2>${tasks.length?dueBars:'<div class="empty-note">目前沒有任務</div>'}</div>
+      <div class="panel"><h2>依優先級分佈(待完成)</h2>${active.length?prioBars:'<div class="empty-note">目前沒有待辦任務</div>'}</div>
+      <div class="panel"><h2>完成進度</h2>${ringHtml}</div>
     </section>
-
     <section class="panel">
-      <h2>新增與維護任務</h2>
+      <h2>新增與維護任務 ${savingMsg?`<span class="saving-tag">${esc(savingMsg)}</span>`:""}</h2>
       <form class="add-form" id="addForm">
-        <input type="text" id="newContent" placeholder="輸入新任務…（可用 Todoist 語法,例如「報價 明天 p1」)" autocomplete="off">
+        <input type="text" id="newContent" placeholder="輸入新任務…" autocomplete="off">
+        <input type="date" id="newDue" title="截止日(可留空)">
         <select id="newPrio">
-          <option value="1">一般</option>
-          <option value="2">P3 中</option>
-          <option value="3">P2 高</option>
-          <option value="4">P1 緊急</option>
+          <option value="1">一般</option><option value="2">P3 中</option><option value="3">P2 高</option><option value="4">P1 緊急</option>
         </select>
         <button class="btn" type="submit" id="addBtn">＋ 新增</button>
       </form>
       <div id="listMsg"></div>
-      <div id="taskList">${rowsHtml}</div>
+      <div id="taskList">${activeHtml}</div>
+      ${completedHtml}
     </section>
+    <footer>資料儲存在你的私人 repo　·　<a id="reload">重新整理</a></footer>`;
 
-    <footer>資料即時來自你的 Todoist　·　<a href="#" id="reload">重新整理</a></footer>`;
-
-  document.getElementById("gear").onclick = openSettings;
-  document.getElementById("reload").onclick = e => { e.preventDefault(); load(); };
-  document.getElementById("addForm").onsubmit = onAdd;
-  app.querySelectorAll(".check").forEach(c => c.onclick = () => onComplete(c.dataset.id));
+  document.getElementById("gear").onclick=openSettings;
+  document.getElementById("reload").onclick=()=>load();
+  document.getElementById("addForm").onsubmit=onAdd;
+  const tg=document.getElementById("toggleDone");
+  if(tg) tg.onclick=()=>{ const l=document.getElementById("doneList"); const open=l.style.display!=="none"; l.style.display=open?"none":"block"; tg.textContent=`已完成 (${completed.length}) ${open?"▾":"▴"}`; };
+  app.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>onAction(b.dataset.act,b.dataset.id));
 }
 
-function openSettings() {
-  if (confirm("要清除這台裝置上儲存的 Todoist 金鑰嗎?(清除後需要重新貼上金鑰)")) {
-    localStorage.removeItem(TOKEN_KEY);
-    renderSetup();
-  }
+function openSettings(){
+  if(confirm("要清除這台裝置上儲存的 GitHub 設定嗎?(清除後需要重新填帳號/repo/token)")){ localStorage.removeItem(CFG_KEY); cfg=null; renderSetup(); }
+}
+function flash(msg,ok){ const box=document.getElementById("listMsg"); if(box) box.innerHTML=`<div class="msg ${ok?'ok':'err'}">${esc(msg)}</div>`; }
+
+async function persist(msg, commitMsg){
+  if(busy) return; busy=true;
+  renderDashboard(msg||"儲存中…");
+  try { await saveData(commitMsg); renderDashboard(); }
+  catch(err){ if(err.code===401){ cfg=null; return renderSetup("token 無效或已過期,請重新設定。"); }
+    renderDashboard(); flash("儲存失敗:"+err.message,false); }
+  finally { busy=false; }
 }
 
-function flash(msg, ok) {
-  const box = document.getElementById("listMsg");
-  if (box) box.innerHTML = `<div class="msg ${ok?'ok':'err'}">${esc(msg)}</div>`;
-}
-
-async function onAdd(e) {
+async function onAdd(e){
   e.preventDefault();
-  const inp = document.getElementById("newContent");
-  const prio = document.getElementById("newPrio");
-  const btn = document.getElementById("addBtn");
-  const content = inp.value.trim();
-  if (!content) return;
-  btn.disabled = true; btn.textContent = "新增中…";
-  try {
-    await api("/tasks", { method: "POST", body: JSON.stringify({ content, priority: Number(prio.value) }) });
-    inp.value = ""; prio.value = "1";
-    await refreshTasks();
-    flash("已新增到 Todoist ✓", true);
-  } catch (err) {
-    if (err.auth) return renderSetup("金鑰無效或已過期,請重新貼上。");
-    flash("新增失敗:" + err.message, false);
-  } finally { btn.disabled = false; btn.textContent = "＋ 新增"; }
+  const inp=document.getElementById("newContent"), due=document.getElementById("newDue"), prio=document.getElementById("newPrio");
+  const content=inp.value.trim(); if(!content) return;
+  state.tasks.push({ id:uid(), content, priority:Number(prio.value), due:due.value||null, done:false, createdAt:new Date().toISOString() });
+  await persist("新增中…","add task");
 }
 
-async function onComplete(id) {
-  const row = app.querySelector(`.task[data-id="${id}"]`);
-  if (row) row.classList.add("done-anim");
-  try {
-    await api("/tasks/" + id + "/close", { method: "POST" });
-    sessionDone++;
-    tasks = tasks.filter(t => t.id !== id);
-    setTimeout(() => renderDashboard(), 320);
-  } catch (err) {
-    if (row) row.classList.remove("done-anim");
-    if (err.auth) return renderSetup("金鑰無效或已過期,請重新貼上。");
-    flash("完成失敗:" + err.message, false);
-  }
+async function onAction(act,id){
+  const t=state.tasks.find(x=>x.id===id); if(!t) return;
+  if(act==="done"){ t.done=true; t.completedAt=new Date().toISOString(); await persist("完成中…","complete task"); }
+  else if(act==="undone"){ t.done=false; delete t.completedAt; await persist("還原中…","reopen task"); }
+  else if(act==="del"){ if(!confirm("確定刪除這個任務?")) return; state.tasks=state.tasks.filter(x=>x.id!==id); await persist("刪除中…","delete task"); }
 }
 
-async function refreshTasks() {
-  tasks = await api("/tasks") || [];
-  // sort: overdue/today first, then by priority desc, then keep order
-  const rank = t => (dueStatus(t)==="overdue"?0:dueStatus(t)==="today"?1:2);
-  tasks.sort((a,b) => rank(a)-rank(b) || b.priority-a.priority);
-  renderDashboard();
-}
-
-async function load() {
-  if (!token()) return renderSetup();
-  app.innerHTML = `<div class="loading">與 Todoist 同步中…</div>`;
-  try {
-    await refreshTasks();
-  } catch (err) {
-    if (err.auth) return renderSetup("金鑰無效或已過期,請重新貼上。");
-    app.innerHTML = `<div class="center-card"><div class="setup">
-      <h1>無法連線</h1>
-      <p>連 Todoist 時發生問題:${esc(err.message)}。請檢查網路後重試。</p>
+async function load(){
+  cfg=loadCfg();
+  if(!cfg){ renderSetup(); return; }
+  app.innerHTML=`<div class="loading">與 GitHub 同步中…</div>`;
+  try { await loadData(); renderDashboard(); }
+  catch(err){
+    if(err.code===401){ cfg=null; return renderSetup("token 無效或已過期,請重新設定。"); }
+    if(err.code===403||err.code===404){ return renderSetup(err.message); }
+    app.innerHTML=`<div class="center-card"><div class="setup">
+      <h1>無法連線</h1><p>連 GitHub 時發生問題:${esc(err.message)}。</p>
       <button class="btn" onclick="location.reload()">重試</button>
-      <div class="hint" style="margin-top:14px">若持續失敗,可能是瀏覽器擋掉了跨網域請求,請改用其他瀏覽器再試。</div>
-    </div></div>`;
+      <div class="hint" style="margin-top:12px">若持續失敗,可按重試,或檢查網路。</div></div></div>`;
   }
 }
 
