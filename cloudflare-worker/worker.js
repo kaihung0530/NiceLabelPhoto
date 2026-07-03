@@ -166,9 +166,9 @@ const LINE_HELP = [
   "完成:完成 2　(第 2 筆)",
   "",
   "── 行程(Google 日曆)──",
-  "新增:行程 : 日期 時間 內容",
-  "　例如「行程 : 明天 14:00 拜訪宏益」",
-  "　例如「行程 : 7/10 出差台中」(全天)",
+  "新增:行程 : 日期 時間 內容 @地點",
+  "　例如「行程 : 明天 14:00 拜訪宏益 @宜兒樂澄清店」",
+  "　例如「行程 : 7/10 出差台中」(全天,@地點可省略)",
   "查看:今天行程 / 明天行程 / 本週行程"
 ].join("\n");
 
@@ -328,19 +328,23 @@ function parseSchedule(text) {
     hh = fixAmPm(m[1], +m[2]); mm = m[3] ? 30 : 0; rest = rest.slice(m[0].length);
   }
 
-  const title = rest.trim();
+  let title = rest.trim();
+  let location = null;
+  const lm = title.match(/[@＠]\s*(.+)$/);
+  if (lm) { location = lm[1].trim(); title = title.slice(0, lm.index).trim(); }
   if (!title) return null;
-  return { y: y, mo: mo, da: da, hh: hh, mm: mm, title: title };
+  return { y: y, mo: mo, da: da, hh: hh, mm: mm, title: title, location: location };
 }
 
 async function gcalAdd(text, env) {
   const p = parseSchedule(text);
   if (!p) {
-    return "格式看不懂 😅 請用:\n行程 : 日期 時間 內容\n例如「行程 : 明天 14:00 拜訪宏益」\n或「行程 : 7/10 出差台中」(全天)";
+    return "格式看不懂 😅 請用:\n行程 : 日期 時間 內容 @地點\n例如「行程 : 明天 14:00 拜訪宏益 @宜兒樂澄清店」\n或「行程 : 7/10 出差台中」(全天,地點可省略)";
   }
   const token = await googleAccessToken(env);
   const dateStr = p.y + "-" + pad2(p.mo) + "-" + pad2(p.da);
   const ev = { summary: p.title };
+  if (p.location) ev.location = p.location;
   let whenText;
   if (p.hh === null) {
     const next = new Date(Date.UTC(p.y, p.mo - 1, p.da) + 86400000);
@@ -360,7 +364,7 @@ async function gcalAdd(text, env) {
   });
   const j = await res.json();
   if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
-  return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText;
+  return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText + (p.location ? "\n📍 " + p.location : "");
 }
 
 async function gcalListRange(fromDays, toDays, label, env) {
@@ -395,7 +399,7 @@ async function gcalListRange(fromDays, toDays, label, env) {
       lines.push((lines.length ? "\n" : "") + "▍" + (+dd[1]) + "/" + (+dd[2]) + "(" + WEEKDAY[wd] + ")");
       lastDate = dateKey;
     }
-    lines.push("• " + timeText + "　" + (ev.summary || "(未命名)"));
+    lines.push("• " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? "\n　📍 " + ev.location : ""));
   }
   return "📅 " + label + "的行程\n\n" + lines.join("\n");
 }
