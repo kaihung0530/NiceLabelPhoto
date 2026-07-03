@@ -1,13 +1,22 @@
 /**
- * 我的 Todo — 單一 Cloudflare Worker(前端 + 後端 + KV 儲存)
+ * 我的 Todo — 單一 Cloudflare Worker(前端 + 後端 + KV 儲存 + LINE bot)
  *
  * 需要綁定:
  *   - KV Namespace binding，變數名稱: TODO_KV
- *   - 環境變數/密鑰:  APP_PASSWORD  (你自己設的登入密碼)
+ *   - 環境變數/密鑰:  APP_PASSWORD               (dashboard 登入密碼)
+ *   - 環境變數/密鑰:  LINE_CHANNEL_SECRET        (LINE channel secret,驗證訊息來源)
+ *   - 環境變數/密鑰:  LINE_CHANNEL_ACCESS_TOKEN  (LINE channel access token,回覆訊息用)
  *
  * 路由:
  *   GET  /       -> 回傳 dashboard 網頁
  *   POST /api    -> {action:'list'|'add'|'complete'|'reopen'|'delete', ...}  (需帶 x-app-password)
+ *   POST /line   -> LINE Messaging API webhook
+ *
+ * LINE 指令:
+ *   待辦 : 內容      -> 新增待辦(冒號全形半形皆可)
+ *   待辦事項         -> 列出待辦清單
+ *   完成 2           -> 完成清單上第 2 筆
+ *   其他文字         -> 回覆使用說明
  */
 
 export default {
@@ -18,6 +27,9 @@ export default {
     }
     if (url.pathname === "/api") {
       return handleApi(request, env);
+    }
+    if (url.pathname === "/line") {
+      return handleLine(request, env);
     }
     return new Response("Not found", { status: 404 });
   }
@@ -76,6 +88,134 @@ async function handleApi(request, env) {
     return json({ error: "unknown action" }, 400);
   }
   return json({ tasks: tasks });
+}
+
+/* ---------------- LINE bot ---------------- */
+
+async function handleLine(request, env) {
+  if (request.method !== "POST") return new Response("ok");
+  const bodyText = await request.text();
+
+  const sig = request.headers.get("x-line-signature") || "";
+  const valid = await verifyLineSignature(bodyText, sig, env.LINE_CHANNEL_SECRET);
+  if (!valid) return new Response("bad signature", { status: 403 });
+
+  let body;
+  try { body = JSON.parse(bodyText); } catch (e) { body = {}; }
+  const events = body.events || [];
+
+  for (const ev of events) {
+    if (ev.type === "message" && ev.message && ev.message.type === "text" && ev.replyToken) {
+      const replyText = await processLineCommand(ev.message.text, env);
+      if (replyText) await lineReply(ev.replyToken, replyText, env.LINE_CHANNEL_ACCESS_TOKEN);
+    }
+  }
+  return new Response("ok");
+}
+
+async function verifyLineSignature(body, signature, secret) {
+  if (!secret || !signature) return false;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, enc.encode(body));
+  const bytes = new Uint8Array(mac);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin) === signature;
+}
+
+async function lineReply(replyToken, text, token) {
+  if (!token) return;
+  try {
+    await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: { "content-type": "application/json", "authorization": "Bearer " + token },
+      body: JSON.stringify({ replyToken: replyToken, messages: [{ type: "text", text: String(text).slice(0, 4900) }] })
+    });
+  } catch (e) { /* reply 失敗不影響 webhook 回應 */ }
+}
+
+/* 台灣時區的今天 (UTC+8) */
+function twToday() {
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  const pad = n => (n < 10 ? "0" : "") + n;
+  return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+}
+
+/* 與 dashboard 相同的排序:逾期 > 今天 > 其他,再依優先級高到低 */
+function sortActive(tasks) {
+  const today = twToday();
+  const rank = t => (!t.due ? 2 : t.due < today ? 0 : t.due === today ? 1 : 2);
+  return tasks.filter(t => !t.done).sort((a, b) =>
+    rank(a) - rank(b) || b.priority - a.priority || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+}
+
+const LINE_HELP = [
+  "你可以這樣使用 📝",
+  "",
+  "新增待辦:",
+  "　待辦 : 內容",
+  "　例如「待辦 : 回覆宏益報價」",
+  "",
+  "查看清單:",
+  "　待辦事項",
+  "",
+  "完成任務:",
+  "　完成 2　(完成清單上第 2 筆)"
+].join("\n");
+
+async function processLineCommand(text, env) {
+  const t = String(text || "").trim();
+
+  let tasks = (await env.TODO_KV.get("todos", "json")) || [];
+  if (!Array.isArray(tasks)) tasks = [];
+
+  /* 新增: 待辦 : XXX (全形/半形冒號皆可) */
+  let m = t.match(/^待辦\s*[:：]\s*(.+)$/s);
+  if (m) {
+    const content = m[1].trim();
+    if (!content) return "內容是空的喔,格式:待辦 : 內容";
+    tasks.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      content: content,
+      priority: 1,
+      due: null,
+      done: false,
+      createdAt: new Date().toISOString()
+    });
+    await env.TODO_KV.put("todos", JSON.stringify(tasks));
+    const activeCount = tasks.filter(x => !x.done).length;
+    return "✅ 已新增待辦:\n「" + content + "」\n\n目前共 " + activeCount + " 筆待完成";
+  }
+
+  /* 列出清單 */
+  if (/^(待辦事項|待辦清單|清單|待辦)$/.test(t)) {
+    const active = sortActive(tasks);
+    if (!active.length) return "🎉 目前沒有待辦事項,全部清空了!";
+    const today = twToday();
+    const prioMark = { 4: "🔴P1 ", 3: "🟡P2 ", 2: "🔵P3 ", 1: "" };
+    const lines = active.map((x, i) => {
+      let due = "";
+      if (x.due) due = x.due < today ? "(" + x.due + " ⚠️逾期)" : x.due === today ? "(今天)" : "(" + x.due + ")";
+      return (i + 1) + ". " + prioMark[x.priority] + x.content + due;
+    });
+    return "📋 待辦清單(" + active.length + " 筆)\n\n" + lines.join("\n") + "\n\n完成請回覆:完成 1";
+  }
+
+  /* 完成第 N 筆 */
+  m = t.match(/^完成\s*(\d+)$/);
+  if (m) {
+    const idx = Number(m[1]) - 1;
+    const active = sortActive(tasks);
+    if (idx < 0 || idx >= active.length) return "找不到第 " + m[1] + " 筆,目前清單有 " + active.length + " 筆。先傳「待辦事項」看編號喔。";
+    const target = active[idx];
+    tasks = tasks.map(x => x.id === target.id ? Object.assign({}, x, { done: true, completedAt: new Date().toISOString() }) : x);
+    await env.TODO_KV.put("todos", JSON.stringify(tasks));
+    const remain = tasks.filter(x => !x.done).length;
+    return "🎉 已完成:\n「" + target.content + "」\n\n還剩 " + remain + " 筆待完成";
+  }
+
+  return LINE_HELP;
 }
 
 const HTML = `<!DOCTYPE html>

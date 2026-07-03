@@ -50,5 +50,25 @@
 - KV 是「最終一致」:同一秒在兩台裝置各改一次,偶爾其中一台要重新整理才看到最新。個人單人使用基本無感。
 - 免費額度:每天 10 萬次讀取、1000 次寫入,個人用綽綽有餘。
 
-## 未來擴充(預留)
-之後要加 **LINE bot**,可在同一個 Worker 增加一個 `/line` 路由當 webhook,共用同一份 KV 資料。
+## LINE bot(已內建)
+
+同一個 Worker 的 `/line` 路由就是 LINE webhook,與 dashboard 共用同一份 KV 資料。
+
+### 支援指令
+| 你傳的訊息 | bot 動作 |
+|---|---|
+| `待辦 : 內容`(全形/半形冒號皆可) | 新增一筆待辦並回覆確認 |
+| `待辦事項`(或 `待辦清單`) | 列出目前待辦(逾期/今天優先、標優先級) |
+| `完成 2` | 完成清單上第 2 筆 |
+| 其他文字 | 回覆使用說明 |
+
+### 設定步驟
+1. Worker **設定 → 變數與機密** 再加兩個 Secret:
+   - `LINE_CHANNEL_SECRET`:LINE Developers → 你的 channel → **Basic settings** → Channel secret
+   - `LINE_CHANNEL_ACCESS_TOKEN`:**Messaging API** 分頁 → Channel access token → **Issue** 後複製
+2. 把最新的 `worker.js` 貼進 Worker 編輯器重新 **Deploy**
+3. LINE Developers → **Messaging API** 分頁 → Webhook settings:
+   - Webhook URL 填:`https://<你的worker網址>/line`
+   - 開啟 **Use webhook**,按 **Verify** 應顯示 Success
+4. 關閉自動回應:Messaging API 分頁裡把 **Auto-reply messages** 設為 Disabled(不然每句都會多一條罐頭回覆)
+5. 用 Messaging API 分頁的 QR code 加 bot 好友,傳「待辦事項」測試
