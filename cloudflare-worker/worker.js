@@ -38,6 +38,11 @@ export default {
       return handleLine(request, env);
     }
     return new Response("Not found", { status: 404 });
+  },
+
+  /* Cron 觸發:自動推播今日摘要(在 Cloudflare 觸發事件設定排程) */
+  async scheduled(event, env, ctx) {
+    await sendDailyDigest(env);
   }
 };
 
@@ -112,6 +117,11 @@ async function handleLine(request, env) {
 
   for (const ev of events) {
     if (ev.type === "message" && ev.message && ev.message.type === "text" && ev.replyToken) {
+      /* 記住使用者 ID,自動推播用 */
+      if (ev.source && ev.source.userId) {
+        const prev = await env.TODO_KV.get("line_user_id");
+        if (prev !== ev.source.userId) await env.TODO_KV.put("line_user_id", ev.source.userId);
+      }
       const replyText = await processLineCommand(ev.message.text, env);
       if (replyText) await lineReply(ev.replyToken, replyText, env.LINE_CHANNEL_ACCESS_TOKEN);
     }
@@ -139,6 +149,77 @@ async function lineReply(replyToken, text, token) {
       body: JSON.stringify({ replyToken: replyToken, messages: [{ type: "text", text: String(text).slice(0, 4900) }] })
     });
   } catch (e) { /* reply 失敗不影響 webhook 回應 */ }
+}
+
+async function linePush(userId, text, token) {
+  if (!token || !userId) return false;
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: { "content-type": "application/json", "authorization": "Bearer " + token },
+      body: JSON.stringify({ to: userId, messages: [{ type: "text", text: String(text).slice(0, 4900) }] })
+    });
+    return res.ok;
+  } catch (e) { return false; }
+}
+
+/* ---- 每日摘要(Cron 自動推播) ---- */
+
+async function buildDailyDigest(env) {
+  const p = twDateParts(0);
+  const lines = ["☀️ 早安!今日摘要 " + p.m + "/" + p.d + "(" + WEEKDAY[p.w] + ")"];
+
+  /* 待辦 */
+  let tasks = (await env.TODO_KV.get("todos", "json")) || [];
+  if (!Array.isArray(tasks)) tasks = [];
+  const active = sortActive(tasks);
+  if (active.length) {
+    const today = twToday();
+    const prioMark = { 4: "🔴P1 ", 3: "🟡P2 ", 2: "🔵P3 ", 1: "" };
+    lines.push("", "📝 待辦(" + active.length + " 筆)");
+    active.forEach((x, i) => {
+      let due = "";
+      if (x.due) due = x.due < today ? "(" + x.due + " ⚠️逾期)" : x.due === today ? "(今天)" : "(" + x.due + ")";
+      lines.push((i + 1) + ". " + prioMark[x.priority] + x.content + due);
+    });
+    lines.push("完成請回覆:完成 1");
+  } else {
+    lines.push("", "📝 沒有待辦事項 🎉");
+  }
+
+  /* 今日行程(未設定 Google 就跳過) */
+  if (env.GOOGLE_SA_KEY && env.GOOGLE_CALENDAR_ID) {
+    try {
+      const token = await googleAccessToken(env);
+      const a = twDateParts(0), b = twDateParts(1);
+      const timeMin = a.y + "-" + pad2(a.m) + "-" + pad2(a.d) + "T00:00:00+08:00";
+      const timeMax = b.y + "-" + pad2(b.m) + "-" + pad2(b.d) + "T00:00:00+08:00";
+      const url = "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(env.GOOGLE_CALENDAR_ID) + "/events" +
+        "?singleEvents=true&orderBy=startTime&maxResults=50" +
+        "&timeMin=" + encodeURIComponent(timeMin) + "&timeMax=" + encodeURIComponent(timeMax);
+      const res = await fetch(url, { headers: { "authorization": "Bearer " + token } });
+      const j = await res.json();
+      const items = (res.ok && j.items) ? j.items : [];
+      lines.push("", "📅 今日行程");
+      if (items.length) {
+        for (const ev of items) {
+          const timeText = (ev.start && ev.start.dateTime) ? ev.start.dateTime.slice(11, 16) : "全天";
+          lines.push("• " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? "\n　📍 " + ev.location : ""));
+        }
+      } else {
+        lines.push("今天沒有安排行程");
+      }
+    } catch (e) { /* 行事曆讀不到就略過,不影響待辦推播 */ }
+  }
+
+  return lines.join("\n");
+}
+
+async function sendDailyDigest(env) {
+  const userId = await env.TODO_KV.get("line_user_id");
+  if (!userId) return false;
+  const text = await buildDailyDigest(env);
+  return linePush(userId, text, env.LINE_CHANNEL_ACCESS_TOKEN);
 }
 
 /* 台灣時區的今天 (UTC+8) */
@@ -171,7 +252,10 @@ const LINE_HELP = [
   "　例如「行程 : 7/10 出差台中」(全天,@地點可省略)",
   "查看:今天行程 / 明天行程 / 本週行程 / 本月行程 / 下月行程",
   "改期:改行程 2 明天 15:00(先查行程看編號)",
-  "刪除:刪行程 2"
+  "刪除:刪行程 2",
+  "",
+  "── 其他 ──",
+  "今日摘要:立即收到一則今日待辦+行程"
 ].join("\n");
 
 async function processLineCommand(text, env) {
@@ -212,6 +296,12 @@ async function processLineCommand(text, env) {
   if (g) {
     try { return await gcalDelete(Number(g[1]), env); }
     catch (e) { return "❌ 刪除行程失敗:" + e.message; }
+  }
+
+  /* 手動測試每日摘要推播 */
+  if (/^(推播測試|測試推播|今日摘要)$/.test(t)) {
+    const okPush = await sendDailyDigest(env);
+    return okPush ? null : "❌ 推播失敗:請先傳過任意訊息讓我記住你,並確認 access token 正確";
   }
 
   let tasks = (await env.TODO_KV.get("todos", "json")) || [];
