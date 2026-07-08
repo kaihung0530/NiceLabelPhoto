@@ -140,27 +140,64 @@ async function verifyLineSignature(body, signature, secret) {
   return btoa(bin) === signature;
 }
 
-async function lineReply(replyToken, text, token) {
+/* 把 string / message物件 / 陣列 統一成 LINE messages 陣列(最多 5 則) */
+function toLineMessages(payload) {
+  const arr = Array.isArray(payload) ? payload : [payload];
+  return arr.filter(m => m != null)
+    .map(m => (typeof m === "string") ? { type: "text", text: m.slice(0, 4900) } : m)
+    .slice(0, 5);
+}
+
+async function lineReply(replyToken, payload, token) {
   if (!token) return;
   try {
     await fetch("https://api.line.me/v2/bot/message/reply", {
       method: "POST",
       headers: { "content-type": "application/json", "authorization": "Bearer " + token },
-      body: JSON.stringify({ replyToken: replyToken, messages: [{ type: "text", text: String(text).slice(0, 4900) }] })
+      body: JSON.stringify({ replyToken: replyToken, messages: toLineMessages(payload) })
     });
   } catch (e) { /* reply 失敗不影響 webhook 回應 */ }
 }
 
-async function linePush(userId, text, token) {
+async function linePush(userId, payload, token) {
   if (!token || !userId) return false;
   try {
     const res = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
       headers: { "content-type": "application/json", "authorization": "Bearer " + token },
-      body: JSON.stringify({ to: userId, messages: [{ type: "text", text: String(text).slice(0, 4900) }] })
+      body: JSON.stringify({ to: userId, messages: toLineMessages(payload) })
     });
     return res.ok;
   } catch (e) { return false; }
+}
+
+/* 一顆「導航」按鈕(Flex),點了開 Google 地圖,不顯示長網址 */
+function navButton(loc) {
+  return { type: "button", style: "link", height: "sm",
+    action: { type: "uri", label: "🧭 開啟導航", uri: mapsLink(loc) } };
+}
+
+/* 把行程陣列做成 Flex 卡片(依日期分組,有地點的附導航按鈕) */
+function flexSchedule(title, events, footer) {
+  const body = [{ type: "text", text: "📅 " + title, weight: "bold", size: "md" }];
+  const shown = events.slice(0, 30);
+  let lastDate = "";
+  shown.forEach(ev => {
+    if (ev.date !== lastDate) {
+      const dd = ev.date.split("-");
+      const wd = new Date(Date.UTC(+dd[0], +dd[1] - 1, +dd[2])).getUTCDay();
+      body.push({ type: "text", text: "▍" + (+dd[1]) + "/" + (+dd[2]) + "(" + WEEKDAY[wd] + ")", weight: "bold", size: "sm", color: "#666666", margin: "md" });
+      lastDate = ev.date;
+    }
+    body.push({ type: "text", text: ev.n + ". " + (ev.time || "全天") + "　" + ev.summary, wrap: true, size: "sm", margin: "sm" });
+    if (ev.location) {
+      body.push({ type: "text", text: "📍 " + ev.location, wrap: true, size: "xs", color: "#999999" });
+      body.push(navButton(ev.location));
+    }
+  });
+  if (events.length > 30) body.push({ type: "text", text: "(僅顯示前 30 筆)", size: "xs", color: "#999999", margin: "md" });
+  if (footer) body.push({ type: "text", text: footer, size: "xs", color: "#aaaaaa", wrap: true, margin: "md" });
+  return { type: "flex", altText: "📅 " + title, contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", spacing: "none", contents: body } } };
 }
 
 /* ---- 每日摘要(Cron 自動推播) ---- */
@@ -187,7 +224,10 @@ async function buildDailyDigest(env) {
     lines.push("", "📝 沒有待辦事項 🎉");
   }
 
+  const messages = [];
+
   /* 今日行程(未設定 Google 就跳過) */
+  let scheduleFlex = null;
   if (env.GOOGLE_SA_KEY && env.GOOGLE_CALENDAR_ID) {
     try {
       const token = await googleAccessToken(env);
@@ -200,26 +240,31 @@ async function buildDailyDigest(env) {
       const res = await fetch(url, { headers: { "authorization": "Bearer " + token } });
       const j = await res.json();
       const items = (res.ok && j.items) ? j.items : [];
-      lines.push("", "📅 今日行程");
       if (items.length) {
-        for (const ev of items) {
-          const timeText = (ev.start && ev.start.dateTime) ? ev.start.dateTime.slice(11, 16) : "全天";
-          lines.push("• " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? locBlock(ev.location, "　") : ""));
-        }
+        const events = items.map((ev, i) => ({
+          n: i + 1,
+          summary: ev.summary || "(未命名)",
+          date: (ev.start && ev.start.dateTime) ? ev.start.dateTime.slice(0, 10) : (ev.start && ev.start.date) || twToday(),
+          time: (ev.start && ev.start.dateTime) ? ev.start.dateTime.slice(11, 16) : null,
+          location: ev.location || null
+        }));
+        scheduleFlex = flexSchedule("今日行程", events, null);
       } else {
-        lines.push("今天沒有安排行程");
+        lines.push("", "📅 今天沒有安排行程");
       }
     } catch (e) { /* 行事曆讀不到就略過,不影響待辦推播 */ }
   }
 
-  return lines.join("\n");
+  messages.push(lines.join("\n"));           // 訊息1:待辦(純文字)
+  if (scheduleFlex) messages.push(scheduleFlex);  // 訊息2:今日行程(Flex,附導航)
+  return messages;
 }
 
 async function sendDailyDigest(env) {
   const userId = await env.TODO_KV.get("line_user_id");
   if (!userId) return false;
-  const text = await buildDailyDigest(env);
-  return linePush(userId, text, env.LINE_CHANNEL_ACCESS_TOKEN);
+  const messages = await buildDailyDigest(env);
+  return linePush(userId, messages, env.LINE_CHANNEL_ACCESS_TOKEN);
 }
 
 /* 台灣時區的今天 (UTC+8) */
@@ -360,14 +405,9 @@ async function processLineCommand(text, env) {
 const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 const pad2 = n => (n < 10 ? "0" : "") + n;
 
-/* 產生 Google 地圖導航連結(在 LINE 裡可直接點,開啟導航) */
+/* 產生 Google 地圖導航連結(給 Flex 導航按鈕用) */
 function mapsLink(loc) {
   return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(loc);
-}
-/* 地點區塊:名稱 + 可點的導航連結 */
-function locBlock(loc, indent) {
-  const pre = indent || "";
-  return "\n" + pre + "📍 " + loc + "\n" + pre + "🗺 " + mapsLink(loc);
 }
 
 /* 台灣時區 (UTC+8) 往後 offsetDays 天的年月日 */
@@ -504,7 +544,15 @@ async function gcalAdd(text, env) {
   });
   const j = await res.json();
   if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
-  return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText + (p.location ? locBlock(p.location, "") : "");
+  if (!p.location) return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText;
+  return { type: "flex", altText: "📅 已加入行事曆:" + p.title,
+    contents: { type: "bubble", body: { type: "box", layout: "vertical", spacing: "sm", contents: [
+      { type: "text", text: "📅 已加入行事曆", weight: "bold", size: "md" },
+      { type: "text", text: "「" + p.title + "」", wrap: true, size: "sm" },
+      { type: "text", text: whenText, size: "sm", color: "#666666" },
+      { type: "text", text: "📍 " + p.location, wrap: true, size: "xs", color: "#999999" },
+      navButton(p.location)
+    ] } } };
 }
 
 async function gcalListRange(fromDays, toDays, label, env) {
@@ -536,9 +584,7 @@ async function gcalListBetween(timeMin, timeMax, label, env) {
   const items = j.items || [];
   if (!items.length) return "📅 " + label + "沒有安排行程,好好休息 😌";
 
-  const lines = [];
   const mapping = [];   // 記住編號對應,給「改行程 N / 刪行程 N」用
-  let lastDate = "";
   for (const ev of items) {
     let dateKey, timeText;
     if (ev.start && ev.start.dateTime) {
@@ -549,22 +595,15 @@ async function gcalListBetween(timeMin, timeMax, label, env) {
       dateKey = ev.start.date;
       timeText = "全天";
     } else { continue; }
-    if (dateKey !== lastDate) {
-      const dd = dateKey.split("-");
-      const wd = new Date(Date.UTC(+dd[0], +dd[1] - 1, +dd[2])).getUTCDay();
-      lines.push((lines.length ? "\n" : "") + "▍" + (+dd[1]) + "/" + (+dd[2]) + "(" + WEEKDAY[wd] + ")");
-      lastDate = dateKey;
-    }
     let durMin = null;
     if (ev.start && ev.start.dateTime && ev.end && ev.end.dateTime) {
       durMin = Math.round((Date.parse(ev.end.dateTime) - Date.parse(ev.start.dateTime)) / 60000);
     }
-    mapping.push({ id: ev.id, summary: ev.summary || "(未命名)", date: dateKey, time: timeText === "全天" ? null : timeText, durMin: durMin });
-    lines.push(mapping.length + ". " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? locBlock(ev.location, "　") : ""));
+    mapping.push({ n: mapping.length + 1, id: ev.id, summary: ev.summary || "(未命名)", date: dateKey,
+      time: timeText === "全天" ? null : timeText, durMin: durMin, location: ev.location || null });
   }
   await env.TODO_KV.put("gcal_last_list", JSON.stringify(mapping), { expirationTtl: 86400 });
-  return "📅 " + label + "的行程\n\n" + lines.join("\n") +
-    "\n\n改期:改行程 1 明天 15:00\n刪除:刪行程 1";
+  return flexSchedule(label + "的行程", mapping, "改期:改行程 1 明天 15:00　刪除:刪行程 1");
 }
 
 async function gcalModify(n, whenText, env) {
