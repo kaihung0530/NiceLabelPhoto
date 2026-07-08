@@ -204,7 +204,7 @@ async function buildDailyDigest(env) {
       if (items.length) {
         for (const ev of items) {
           const timeText = (ev.start && ev.start.dateTime) ? ev.start.dateTime.slice(11, 16) : "全天";
-          lines.push("• " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? "\n　📍 " + ev.location : ""));
+          lines.push("• " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? locBlock(ev.location, "　") : ""));
         }
       } else {
         lines.push("今天沒有安排行程");
@@ -360,6 +360,16 @@ async function processLineCommand(text, env) {
 const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 const pad2 = n => (n < 10 ? "0" : "") + n;
 
+/* 產生 Google 地圖導航連結(在 LINE 裡可直接點,開啟導航) */
+function mapsLink(loc) {
+  return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(loc);
+}
+/* 地點區塊:名稱 + 可點的導航連結 */
+function locBlock(loc, indent) {
+  const pre = indent || "";
+  return "\n" + pre + "📍 " + loc + "\n" + pre + "🗺 " + mapsLink(loc);
+}
+
 /* 台灣時區 (UTC+8) 往後 offsetDays 天的年月日 */
 function twDateParts(offsetDays) {
   const d = new Date(Date.now() + (8 * 3600 + (offsetDays || 0) * 86400) * 1000);
@@ -494,7 +504,7 @@ async function gcalAdd(text, env) {
   });
   const j = await res.json();
   if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
-  return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText + (p.location ? "\n📍 " + p.location : "");
+  return "📅 已加入行事曆:\n「" + p.title + "」\n" + whenText + (p.location ? locBlock(p.location, "") : "");
 }
 
 async function gcalListRange(fromDays, toDays, label, env) {
@@ -550,7 +560,7 @@ async function gcalListBetween(timeMin, timeMax, label, env) {
       durMin = Math.round((Date.parse(ev.end.dateTime) - Date.parse(ev.start.dateTime)) / 60000);
     }
     mapping.push({ id: ev.id, summary: ev.summary || "(未命名)", date: dateKey, time: timeText === "全天" ? null : timeText, durMin: durMin });
-    lines.push(mapping.length + ". " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? "\n　📍 " + ev.location : ""));
+    lines.push(mapping.length + ". " + timeText + "　" + (ev.summary || "(未命名)") + (ev.location ? locBlock(ev.location, "　") : ""));
   }
   await env.TODO_KV.put("gcal_last_list", JSON.stringify(mapping), { expirationTtl: 86400 });
   return "📅 " + label + "的行程\n\n" + lines.join("\n") +
