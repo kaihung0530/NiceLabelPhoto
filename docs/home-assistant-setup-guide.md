@@ -17,6 +17,7 @@
 8. [第七階段：自動化範例](#8-第七階段自動化範例)
 9. [常見問題與疑難排解](#9-常見問題與疑難排解)
 10. [名詞對照表](#10-名詞對照表)
+11. [附錄 A：用閒置 Mac 當主機（Intel MacBook Air A1932）](#11-附錄-a用閒置-mac-當主機intel-macbook-air-a1932)
 
 ---
 
@@ -296,6 +297,74 @@ mode: single
 | **HomeKit Bridge** | HA 的功能，把 HA 設備偽裝成 HomeKit 設備給 Apple 家庭 |
 | **HomePod mini** | Apple 智慧喇叭，內建 Siri，可當 HomeKit 中樞 |
 | **Nabu Casa** | HA 官方付費雲端服務，用於安全遠端存取 |
+
+---
+
+## 11. 附錄 A：用閒置 Mac 當主機（Intel MacBook Air A1932）
+
+若你有一台閒置的 **Intel 晶片 Mac**（例如 MacBook Air A1932 / Retina 2018–2019），
+可以直接拿來當 Home Assistant 主機，不必另外買硬體。
+
+> ✅ Intel Mac 是 x86-64 架構，Home Assistant OS 原生支援（比 M 系列 Apple Silicon 更好搞）。
+> A1932 的 i5 + 8GB 記憶體對 HA 來說綽綽有餘。
+
+### ⚠️ 關鍵：兩種「保留 macOS」的做法差很多
+
+| 做法 | 接三星（SmartThings） | **橋回 Apple 家庭（HomeKit Bridge）** |
+|------|:---:|:---:|
+| **Docker on Mac** | ✅ 可 | ⚠️ **常失敗** |
+| **UTM 虛擬機（橋接網路）** | ✅ 可 | ✅ **正常** |
+
+**原因**：macOS 上的 Docker 跑在一層 Linux 小 VM 裡，網路是 NAT 隔離的。
+HomeKit Bridge 需要在區網廣播 **mDNS** 讓 iPhone/HomePod 發現它，
+這在 Mac Docker 底下常常失敗。SmartThings 是純雲端 API 不受影響，
+但 HomeKit 這關（本教學重點）會卡住。
+
+> 結論：要達成「用 Siri/HomePod 控三星」的目標，**請用 UTM 虛擬機 + 橋接網路**，
+> 而不是 Docker。UTM 一樣免費、一樣不動你的 macOS 系統。
+
+### UTM 虛擬機安裝步驟
+
+**步驟 1：安裝 UTM（免費）**
+- 到 https://mac.getutm.app 下載免費版（或 App Store 付費版，內容相同）。
+
+**步驟 2：下載 Home Assistant OS 虛擬機映像檔**
+- 到 https://www.home-assistant.io/installation/ → 選 **Linux / VM**。
+- 下載 **KVM/QEMU（`.qcow2`）** 版本。
+- 解壓縮得到 `.qcow2` 檔。
+
+**步驟 3：在 UTM 建立虛擬機**
+- 新增 → **Virtualize**（Intel Mac 選虛擬化）。
+- 系統類型選 **Other / Linux**。
+- 把下載的 `.qcow2` 匯入當作硬碟（Import Drive）。
+- 記憶體給 **2048 MB（2GB）**，CPU 給 **2 核**。
+
+**步驟 4：⭐ 網路模式改成「Bridged（橋接）」** — 最關鍵一步
+- VM 設定 → **Network** → Mode 選 **Bridged (Advanced)**。
+- 這會讓 HA 拿到一個**與你家路由器同網段的獨立 IP**，
+  HomeKit Bridge 才能被 HomePod / iPhone 發現。
+- （若橋接在 Wi-Fi 下不穩，改用 USB-C 轉乙太網路接有線最保險。）
+
+**步驟 5：開機、進入介面**
+- 啟動 VM，等待 5–15 分鐘（首次安裝）。
+- 瀏覽器打開 `http://homeassistant.local:8123`
+  （打不開就用路由器後台查到的那台 VM 的 IP，例如 `http://192.168.1.60:8123`）。
+- 接著回到本文件 **第 4 章** 繼續設定帳號。
+
+**步驟 6：讓 Mac 保持開機不睡眠**
+- 系統設定 → 電池 / 鎖定畫面 → 設定成**插電時永不睡眠**。
+- 闔蓋仍要運作：接電源 + 外接螢幕，或用 Amphetamine（免費）之類工具防止睡眠。
+
+### Mac 當 24/7 主機的注意事項
+
+1. **必須維持開機不睡眠**（見步驟 6），睡了設備就離線。
+2. **電池健康**：A1932 是 2018/2019 機器，長期插電發熱，幾年下來留意電池膨脹
+   （會頂起觸控板/鍵盤），放通風處。
+3. **後續步驟通用**：接三星（第 5 章）、橋回 Apple（第 6 章）的操作與其他主機**完全相同**，
+   主機只是換個載體。將來若想換成省電的樹莓派或 Home Assistant Green，操作也一樣。
+
+> 💡 建議心態：先用 Mac + UTM **免成本把整套流程玩熟、確認可行**，
+> 之後再決定要不要投資省電的專用硬體長期經營。
 
 ---
 
