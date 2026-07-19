@@ -865,32 +865,19 @@ const timeoutSig = (ms) => (typeof AbortSignal !== "undefined" && AbortSignal.ti
  * 沒設就直接連(多半會被擋,但不影響待辦/日曆——那些不會呼叫這裡)。
  * 這是「選用」設計:加不加 key 都不會動到其他功能。
  */
-async function proxiedFetch(targetUrl, env) {
+async function proxiedFetch(targetUrl, env, headers) {
+  const h = headers || {
+    "User-Agent": UA,
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-TW,zh;q=0.9"
+  };
   if (env && env.SCRAPER_API_KEY) {
-    /* keep_headers=true:把下面的 XHR 標頭轉發給目標(591 的清單 API 需要 X-Requested-With 才回 JSON) */
+    /* keep_headers=true:把我們的標頭原封轉發給目標(591 手機 API 需要 device/deviceid 等標頭) */
     const api = "https://api.scraperapi.com/?api_key=" + encodeURIComponent(env.SCRAPER_API_KEY) +
       "&premium=true&keep_headers=true&url=" + encodeURIComponent(targetUrl);
-    return fetch(api, {
-      signal: timeoutSig(28000),   // 住宅 IP 通常一次就成功;逾時 28 秒(留在背景任務時限內)
-      headers: {
-        "User-Agent": UA,
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-TW,zh;q=0.9",
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://sale.591.com.tw/"
-      }
-    });
+    return fetch(api, { signal: timeoutSig(28000), headers: h });   // 住宅 IP 逾時 28 秒(留在背景任務時限內)
   }
-  return fetch(targetUrl, {
-    redirect: "manual",
-    signal: timeoutSig(8000),
-    headers: {
-      "User-Agent": UA,
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "zh-TW,zh;q=0.9",
-      "Referer": "https://www.rakuya.com.tw/sell"
-    }
-  });
+  return fetch(targetUrl, { redirect: "manual", signal: timeoutSig(8000), headers: h });
 }
 
 /* 把某回應的 Set-Cookie 併入 cookie jar(物件:名稱→值) */
@@ -1042,14 +1029,29 @@ async function fetchRakuyaSale(regionName, env) {
 }
 
 /*
- * 來源層(591 清單,單次走 proxy):591 清單是輕量 JSON,單次抓比樂屋 HTML 快、
- * 較可能塞進 Worker 30 秒上限。跳過首頁 csrf 兩步——賭 residential IP 單次就能過;
- * 若 591 仍要 csrf 會回 404 或非 JSON,錯誤訊息會標明。
+ * 來源層(591 手機/touch 清單 API):bff-house.591.com.tw/v1/touch/sale/list。
+ * device_id 自己隨機產生即可(不需 token),回應 data 直接是物件陣列。單次請求、輕量 JSON,
+ * 透過 proxy(住宅 IP)轉發手機標頭。這是目前實測 591 現行的端點。
  */
-async function fetch591Proxy(regionId, env) {
-  const url = "https://sale.591.com.tw/home/search/list?type=2&shType=list&regionid=" + regionId +
-    "&order=posttime_desc&firstRow=0";
-  const res = await proxiedFetch(url, env);
+function randHex(n) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, "").slice(0, n);
+  let s = ""; while (s.length < n) s += Math.floor(Math.random() * 16).toString(16); return s.slice(0, n);
+}
+async function fetch591Mobile(regionId, env) {
+  const devid = randHex(32);
+  const url = "https://bff-house.591.com.tw/v1/touch/sale/list?type=sale&version=2017&regionid=" + regionId +
+    "&firstRow=0&newPageSize=30&device=touch&device_id=" + devid + "&timestamp=" + Date.now();
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-TW,zh;q=0.9",
+    "device": "touch",
+    "deviceid": devid,
+    "origin": "https://m.591.com.tw",
+    "referer": "https://m.591.com.tw/",
+    "Cookie": "T591_TOKEN=" + devid
+  };
+  const res = await proxiedFetch(url, env, headers);
   if (!res.ok) {
     let detail = "";
     try { detail = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140); } catch (_) {}
@@ -1057,29 +1059,31 @@ async function fetch591Proxy(regionId, env) {
       (env && env.SCRAPER_API_KEY ? "(已透過 proxy)" : "") + (detail ? " — " + detail : ""));
   }
   let j;
-  try { j = await res.json(); } catch (e) { throw new Error("591 回傳非 JSON(可能仍需 csrf/被導驗證頁)"); }
-  const raw = (j.data && (j.data.house_list || j.data.list || j.data.topData)) || [];
+  try { j = await res.json(); } catch (e) { throw new Error("591 回傳非 JSON(可能被擋)"); }
+  const raw = Array.isArray(j.data) ? j.data : ((j.data && (j.data.house_list || j.data.items || j.data.data)) || []);
   return raw.map(it => {
-    const id = String(it.id || it.house_id || it.houseid || it.post_id || "");
-    const priceNum = parseFloat(String(it.price != null ? it.price : it.total_price).replace(/[^\d.]/g, ""));
-    const roomNum = parseInt(String(it.room != null ? it.room : (it.layout || "")).replace(/[^\d]/g, ""), 10);
+    const id = String(it.post_id || it.houseid || "").replace(/^S/, "");
+    const priceStr = (it.price_arr && it.price_arr.price) || it.price || "";
+    const priceNum = parseFloat(String(priceStr).replace(/[^\d.]/g, ""));
+    const roomsM = String(it.layout_str || it.title || "").match(/(\d+)\s*房/);
+    const areaNum = (it.areaUnit && it.areaUnit.area) || (String(it.area_str || "").match(/[\d.]+/) || [])[0] || null;
     return {
       id: id,
-      title: it.title || it.community || "(未命名物件)",
-      price: isNaN(priceNum) ? null : priceNum,               // 單位:萬
-      kind: it.kind_name || it.kind || it.houseType || "",
-      rooms: isNaN(roomNum) ? null : roomNum,
-      area: it.area || it.build_area || null,                 // 坪
-      section: it.section_name || it.sectionname || "",
-      address: it.address || ((it.region_name || "") + (it.section_name || "")),
-      url: id ? "https://sale.591.com.tw/home/house/detail/2/" + id + ".html" : "https://sale.591.com.tw/"
+      title: it.title || "(未命名物件)",
+      price: isNaN(priceNum) ? null : priceNum,      // 單位:萬
+      kind: it.kindStr || it.kind || "",
+      rooms: roomsM ? +roomsM[1] : null,
+      area: areaNum,                                  // 坪
+      section: it.section || "",
+      address: it.address || ((it.region || "") + (it.section || "")),
+      url: id ? "https://m.591.com.tw/v2/sale/" + id : "https://m.591.com.tw/"
     };
   }).filter(x => x.id);
 }
 
 /* 取得某監看條件符合的物件(來源整縣市 → 本地過濾) */
 async function fetchListings(watch, env) {
-  const all = await fetch591Proxy(watch.regionId, env);
+  const all = await fetch591Mobile(watch.regionId, env);
   return all.filter(l => matchWatch(l, watch));
 }
 
