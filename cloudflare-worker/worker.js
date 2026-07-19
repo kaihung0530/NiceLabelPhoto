@@ -1037,10 +1037,25 @@ function randHex(n) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, "").slice(0, n);
   let s = ""; while (s.length < n) s += Math.floor(Math.random() * 16).toString(16); return s.slice(0, n);
 }
-async function fetch591Mobile(regionId, env) {
+
+/* 591 行政區代碼(名稱去掉 區/鄉/鎮 後對應 sectionid)。有對到就伺服器端精準篩選 */
+const SECTION_ID = {
+  1: { 中正: 1, 大同: 2, 中山: 3, 松山: 4, 大安: 5, 萬華: 6, 信義: 7, 士林: 8, 北投: 9, 內湖: 10, 南港: 11, 文山: 12 },
+  3: { 萬里: 20, 金山: 21, 板橋: 26, 汐止: 27, 深坑: 28, 石碇: 29, 瑞芳: 30, 平溪: 31, 雙溪: 32, 貢寮: 33, 新店: 34, 坪林: 35, 烏來: 36, 永和: 37, 中和: 38, 土城: 39, 三峽: 40, 樹林: 41, 鶯歌: 42, 三重: 43, 新莊: 44, 泰山: 45, 林口: 46, 蘆洲: 47, 五股: 48, 八里: 49, 淡水: 50, 三芝: 51, 石門: 52 },
+  17: { 新興: 243, 前金: 244, 苓雅: 245, 鹽埕: 246, 鼓山: 247, 旗津: 248, 前鎮: 249, 三民: 250, 楠梓: 251, 小港: 252, 左營: 253, 仁武: 254, 大社: 255, 岡山: 258, 路竹: 259, 阿蓮: 260, 田寮: 261, 燕巢: 262, 橋頭: 263, 梓官: 264, 彌陀: 265, 永安: 266, 湖內: 267, 鳳山: 268, 大寮: 269, 林園: 270, 鳥松: 271, 大樹: 272, 旗山: 273, 美濃: 274, 六龜: 275, 內門: 276, 杉林: 277, 甲仙: 278, 桃源: 279, 那瑪夏: 280, 茂林: 281, 茄萣: 282 }
+};
+
+async function fetch591Mobile(watch, env) {
+  const regionId = watch.regionId;
   const devid = randHex(32);
-  const url = "https://bff-house.591.com.tw/v1/touch/sale/list?type=sale&version=2017&regionid=" + regionId +
+  let url = "https://bff-house.591.com.tw/v1/touch/sale/list?type=sale&version=2017&regionid=" + regionId +
     "&firstRow=0&newPageSize=30&device=touch&device_id=" + devid + "&timestamp=" + Date.now();
+  /* 行政區 → sectionid(伺服器端精準篩選;對不到的區留給本地字串過濾) */
+  const secMap = SECTION_ID[regionId] || {};
+  const secIds = (watch.districts || []).map(d => secMap[d]).filter(Boolean);
+  if (secIds.length) url += "&sectionidStr=" + secIds.join(",");
+  /* 總價上限(萬):$_<max>$ */
+  if (watch.maxPrice != null) url += "&price_str=$_" + watch.maxPrice + "$";
   const headers = {
     "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
     "Accept": "application/json, text/plain, */*",
@@ -1081,9 +1096,9 @@ async function fetch591Mobile(regionId, env) {
   }).filter(x => x.id);
 }
 
-/* 取得某監看條件符合的物件(來源整縣市 → 本地過濾) */
+/* 取得某監看條件符合的物件(伺服器端 region+section+price → 本地再篩種別/房數/區名) */
 async function fetchListings(watch, env) {
-  const all = await fetch591Mobile(watch.regionId, env);
+  const all = await fetch591Mobile(watch, env);
   return all.filter(l => matchWatch(l, watch));
 }
 
