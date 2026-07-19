@@ -868,8 +868,8 @@ const timeoutSig = (ms) => (typeof AbortSignal !== "undefined" && AbortSignal.ti
 async function proxiedFetch(targetUrl, env) {
   if (env && env.SCRAPER_API_KEY) {
     const api = "https://api.scraperapi.com/?api_key=" + encodeURIComponent(env.SCRAPER_API_KEY) +
-      "&country_code=tw&url=" + encodeURIComponent(targetUrl);
-    return fetch(api, { signal: timeoutSig(25000) });   // 走 proxy 較慢,但要留在背景任務時限內,逾時設 25 秒
+      "&premium=true&country_code=tw&url=" + encodeURIComponent(targetUrl);
+    return fetch(api, { signal: timeoutSig(28000) });   // 住宅 IP 通常一次就成功、較快;逾時 28 秒(留在背景任務時限內)
   }
   return fetch(targetUrl, {
     redirect: "manual",
