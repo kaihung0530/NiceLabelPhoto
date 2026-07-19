@@ -868,7 +868,7 @@ const timeoutSig = (ms) => (typeof AbortSignal !== "undefined" && AbortSignal.ti
 async function proxiedFetch(targetUrl, env) {
   if (env && env.SCRAPER_API_KEY) {
     const api = "https://api.scraperapi.com/?api_key=" + encodeURIComponent(env.SCRAPER_API_KEY) +
-      "&premium=true&country_code=tw&url=" + encodeURIComponent(targetUrl);
+      "&premium=true&url=" + encodeURIComponent(targetUrl);
     return fetch(api, { signal: timeoutSig(28000) });   // 住宅 IP 通常一次就成功、較快;逾時 28 秒(留在背景任務時限內)
   }
   return fetch(targetUrl, {
@@ -995,7 +995,11 @@ async function fetchRakuyaSale(regionName, env) {
   const res = await proxiedFetch(url, env);
   if (!res.ok) {
     const viaProxy = env && env.SCRAPER_API_KEY;
-    throw new Error("樂屋網回應 HTTP " + res.status + (viaProxy ? "(已透過 proxy,仍失敗)" : "(可能擋雲端 IP,建議設 SCRAPER_API_KEY)"));
+    let detail = "";
+    try { detail = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140); } catch (_) {}
+    throw new Error("樂屋網回應 HTTP " + res.status +
+      (viaProxy ? "(已透過 proxy)" : "(可能擋雲端 IP,建議設 SCRAPER_API_KEY)") +
+      (detail ? " — " + detail : ""));
   }
   const html = await res.text();
   const blocks = html.match(/<section[^>]*>[\s\S]*?<\/section>/g) || [];
