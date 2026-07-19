@@ -1,0 +1,27 @@
+# Cloudflare Worker 部署設定(給 wrangler / GitHub Actions 自動部署用)
+#
+# ⚠️ 三個一定要改成你自己的值:
+#   1) name              → 你 Cloudflare 上「現有」的 Worker 名稱(填錯會變成新建另一個 Worker!)
+#   2) kv_namespaces.id  → 你的 KV namespace id
+#   3)(可選)crons       → 排程,預設每 3 小時檢查一次房屋新著
+#
+# 找 name:Cloudflare Dashboard → Workers & Pages → 你的 Worker,標題就是名稱。
+# 找 KV id:Storage & Databases → KV → 你的 namespace 右邊會顯示 ID;
+#          或本機執行 `npx wrangler kv namespace list`。
+#
+# 註:APP_PASSWORD / LINE_* / GOOGLE_* 這些機密「不要」寫在這裡。
+#     它們是 Worker Secrets,部署不會動到,維持你在 Cloudflare 後台設定的即可。
+
+name = "my-todo"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+# KV 綁定(變數名稱一定是 TODO_KV,對應程式裡的 env.TODO_KV)
+kv_namespaces = [
+  { binding = "TODO_KV", id = "PUT_YOUR_KV_NAMESPACE_ID_HERE" }
+]
+
+# Cron 排程:每 3 小時跑一次(房屋新著檢查每次都跑;早安摘要一天仍只發一次)
+# 想改時間就改這行,例如每小時 "0 * * * *"、或每天早上台灣 8 點 "0 0 * * *"
+[triggers]
+crons = ["0 */3 * * *"]

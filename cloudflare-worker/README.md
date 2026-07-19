@@ -4,6 +4,7 @@
 全部同源,沒有 CORS 問題,資料由你自己掌控。
 
 - `worker.js` — 完整程式(複製貼上即可用)
+- `wrangler.toml` + `.github/workflows/deploy-worker.yml` — 自動部署設定,詳見 [DEPLOY.md](DEPLOY.md)(設定後 push 到 main 就自動部署,不用手動貼)
 
 ---
 
