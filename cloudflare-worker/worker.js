@@ -844,15 +844,50 @@ function matchWatch(l, w) {
   return true;
 }
 
-/* 把 Set-Cookie(可能多筆)整理成 "k=v; k=v" 的 Cookie 字串 */
-function collectCookies(res) {
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const timeoutSig = () => (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined;
+
+/* 把某回應的 Set-Cookie 併入 cookie jar(物件:名稱→值) */
+function mergeSetCookie(jar, res) {
   let list = [];
   if (typeof res.headers.getSetCookie === "function") list = res.headers.getSetCookie();
   else { const one = res.headers.get("set-cookie"); if (one) list = [one]; }
-  return list.map(c => c.split(";")[0]).filter(Boolean).join("; ");
+  for (const c of list) {
+    const kv = c.split(";")[0];
+    const i = kv.indexOf("=");
+    if (i > 0) jar[kv.slice(0, i).trim()] = kv.slice(i + 1).trim();
+  }
+}
+function jarToCookie(jar) {
+  return Object.keys(jar).map(k => k + "=" + jar[k]).join("; ");
 }
 
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+/* 手動跟隨轉址取首頁,沿途累積所有 cookie(requests.Session 會自動做,fetch 預設看不到中途的) */
+async function fetch591Home() {
+  const jar = {};
+  let url = "https://sale.591.com.tw/";
+  let html = "";
+  for (let i = 0; i < 6; i++) {
+    const res = await fetch(url, {
+      redirect: "manual",
+      signal: timeoutSig(),
+      headers: {
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9",
+        "Cookie": jarToCookie(jar)
+      }
+    });
+    mergeSetCookie(jar, res);
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (loc) { url = new URL(loc, url).toString(); continue; }
+    }
+    html = await res.text();
+    break;
+  }
+  return { html: html, cookie: jarToCookie(jar) };
+}
 
 /*
  * 可替換來源層:向 591 售屋要「整個縣市」的銷售中清單。
@@ -860,31 +895,30 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
  * 若之後被擋死,只要改寫這個函式(例如改抓你提供的 RSS/查詢網址)即可,其餘邏輯不動。
  */
 async function fetch591Sale(regionId) {
-  const timeout = () => (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined;
-  const home = await fetch("https://sale.591.com.tw/", {
-    signal: timeout(),
-    headers: { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml", "Accept-Language": "zh-TW,zh;q=0.9" }
-  });
-  if (!home.ok) throw new Error("連不上 591 首頁(HTTP " + home.status + ")");
-  const html = await home.text();
-  const cm = html.match(/name="csrf-token"\s+content="([^"]+)"/i);
+  const { html, cookie } = await fetch591Home();
+  const cm = html.match(/name=["']csrf-token["']\s+content=["']([^"']+)["']/i) ||
+             html.match(/content=["']([^"']+)["']\s+name=["']csrf-token["']/i);
   const csrf = cm ? cm[1] : "";
-  const cookie = collectCookies(home);
 
   const url = "https://sale.591.com.tw/home/search/list?type=2&shType=list&regionid=" + regionId +
-    "&order=posttime_desc&firstRow=0";
+    "&order=posttime_desc&firstRow=0&recom_community=1&timestamp=" + Date.now();
   const res = await fetch(url, {
-    signal: timeout(),
+    redirect: "manual",
+    signal: timeoutSig(),
     headers: {
       "User-Agent": UA,
       "Accept": "application/json, text/plain, */*",
-      "X-CSRF-TOKEN": csrf,
-      "X-Requested-With": "XMLHttpRequest",
-      "Referer": "https://sale.591.com.tw/",
+      "Accept-Language": "zh-TW,zh;q=0.9",
+      "X-Csrf-Token": csrf,
+      "Cache-Control": "no-cache",
+      "Referer": "https://sale.591.com.tw/?regionid=" + regionId + "&shType=list",
       "Cookie": cookie
     }
   });
-  if (!res.ok) throw new Error("591 清單回應 HTTP " + res.status + "(可能被 bot 防護擋下)");
+  if (!res.ok) {
+    throw new Error("591 清單回應 HTTP " + res.status +
+      (csrf ? "(已取得 csrf)" : "(未取得 csrf,首頁可能被導到驗證頁)"));
+  }
   let j;
   try { j = await res.json(); } catch (e) { throw new Error("591 回傳不是 JSON(可能被導到驗證頁)"); }
   const raw = (j.data && (j.data.house_list || j.data.list || j.data.topData)) || [];
