@@ -40,9 +40,17 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 
-  /* Cron 觸發:自動推播今日摘要(在 Cloudflare 觸發事件設定排程) */
+  /* Cron 觸發:早安摘要(一天一次)+ 房屋新著檢查(每次都跑) */
   async scheduled(event, env, ctx) {
-    await sendDailyDigest(env);
+    /* 早安摘要每天只發一次:即使把 Cron 設成每數小時一次(為了勤跑房屋檢查),也不會洗版 */
+    const today = twToday();
+    const lastDigest = await env.TODO_KV.get("digest_sent_date");
+    if (lastDigest !== today) {
+      const ok = await sendDailyDigest(env);
+      if (ok) await env.TODO_KV.put("digest_sent_date", today);
+    }
+    /* 房屋新著:每次排程都檢查,有新物件才推播 */
+    try { await checkHouseWatches(env); } catch (e) { /* 檢查失敗不影響其他排程 */ }
   }
 };
 
@@ -299,6 +307,14 @@ const LINE_HELP = [
   "改期:改行程 2 明天 15:00(先查行程看編號)",
   "刪除:刪行程 2",
   "",
+  "── 房屋買賣監看 ──",
+  "新增:房屋 : 縣市 行政區… 種別 N房 總價萬",
+  "　例如「房屋 : 高雄 三民 左營 透天 2000萬」",
+  "　(行政區可多個、種別/房數/總價皆可省略)",
+  "查看:房屋清單　刪除:刪房屋 1",
+  "立即查詢:找房",
+  "有新物件會自動用 LINE 通知你 🏠",
+  "",
   "── 其他 ──",
   "今日摘要:立即收到一則今日待辦+行程"
 ].join("\n");
@@ -341,6 +357,65 @@ async function processLineCommand(text, env) {
   if (g) {
     try { return await gcalDelete(Number(g[1]), env); }
     catch (e) { return "❌ 刪除行程失敗:" + e.message; }
+  }
+
+  /* ---- 房屋買賣監看 ---- */
+  let h = t.match(/^房屋\s*[:：]\s*(.+)$/s);
+  if (h) {
+    const w = parseHouseWatch(h[1]);
+    if (!w) {
+      return "看不懂條件 😅 格式:\n房屋 : 縣市 [行政區…] [種別] [N房] [總價萬]\n" +
+        "例如「房屋 : 高雄 三民 左營 透天 2000萬」\n\n支援縣市:" + REGION_LIST.join("、");
+    }
+    let watches = (await env.TODO_KV.get("house_watches", "json")) || [];
+    if (!Array.isArray(watches)) watches = [];
+    w.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    w.createdAt = new Date().toISOString();
+    watches.push(w);
+    await env.TODO_KV.put("house_watches", JSON.stringify(watches));
+    return "✅ 已新增房屋監看:\n" + watchLabel(w) +
+      "\n\n之後出現新物件我會主動用 LINE 通知你。\n傳「找房」可立即查看目前符合的物件。";
+  }
+  if (/^(房屋清單|房屋監看|監看清單)$/.test(t)) {
+    const watches = (await env.TODO_KV.get("house_watches", "json")) || [];
+    if (!Array.isArray(watches) || !watches.length) {
+      return "目前沒有房屋監看條件。\n新增範例:\n房屋 : 高雄 三民 左營 透天 2000萬";
+    }
+    const lines = watches.map((w, i) => (i + 1) + ". " + watchLabel(w));
+    return "🏠 房屋監看清單(" + watches.length + " 筆)\n\n" + lines.join("\n") +
+      "\n\n刪除:刪房屋 1　立即查:找房";
+  }
+  h = t.match(/^(?:刪|刪除|删|删除)房屋\s*(\d+)$/);
+  if (h) {
+    let watches = (await env.TODO_KV.get("house_watches", "json")) || [];
+    if (!Array.isArray(watches)) watches = [];
+    const n = Number(h[1]);
+    if (n < 1 || n > watches.length) return "找不到第 " + n + " 筆,目前有 " + watches.length + " 筆。先傳「房屋清單」看編號。";
+    const removed = watches.splice(n - 1, 1)[0];
+    await env.TODO_KV.put("house_watches", JSON.stringify(watches));
+    await env.TODO_KV.delete("house_seen:" + removed.id);
+    return "🗑 已刪除房屋監看:\n" + watchLabel(removed);
+  }
+  if (/^(找房|房屋搜尋|搜尋房屋)$/.test(t)) {
+    const watches = (await env.TODO_KV.get("house_watches", "json")) || [];
+    if (!Array.isArray(watches) || !watches.length) {
+      return "目前沒有房屋監看條件。\n新增範例:\n房屋 : 高雄 三民 左營 透天 2000萬";
+    }
+    const messages = [];
+    for (const w of watches) {
+      let items;
+      try { items = await fetchListings(w); }
+      catch (e) { messages.push("⚠️ " + watchLabel(w) + "\n查詢失敗:" + e.message); continue; }
+      /* 記住目前這批,之後 Cron 只通知比這更新的物件 */
+      const seenKey = "house_seen:" + w.id;
+      let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
+      if (!Array.isArray(seen)) seen = [];
+      const merged = Array.from(new Set(seen.concat(items.map(it => it.id)))).slice(-300);
+      await env.TODO_KV.put(seenKey, JSON.stringify(merged), { expirationTtl: 60 * 60 * 24 * 30 });
+      if (!items.length) messages.push("🏠 " + watchLabel(w) + "\n目前沒有符合的物件。");
+      else messages.push(flexListings(watchLabel(w), items.slice(0, 10)));
+    }
+    return messages.slice(0, 5);
   }
 
   /* 手動測試每日摘要推播 */
@@ -666,6 +741,209 @@ async function gcalDelete(n, env) {
   list.splice(n - 1, 1);
   await env.TODO_KV.put("gcal_last_list", JSON.stringify(list), { expirationTtl: 86400 });
   return "🗑 已刪除行程:\n「" + it.summary + "」";
+}
+
+/* ---------------- 房屋買賣監看(591 售屋) ---------------- */
+
+/* 縣市 → 591 regionid(含常見簡稱)。查詢只給縣市,行政區/種別在本地端過濾 */
+const REGION_ID = {
+  "台北": 1, "臺北": 1, "台北市": 1, "臺北市": 1,
+  "基隆": 2, "基隆市": 2,
+  "新北": 3, "新北市": 3,
+  "新竹市": 4, "新竹": 4,
+  "新竹縣": 5,
+  "桃園": 6, "桃園市": 6,
+  "苗栗": 7, "苗栗縣": 7,
+  "台中": 8, "臺中": 8, "台中市": 8, "臺中市": 8,
+  "彰化": 10, "彰化縣": 10,
+  "南投": 11, "南投縣": 11,
+  "雲林": 12, "雲林縣": 12,
+  "嘉義市": 13, "嘉義": 13,
+  "嘉義縣": 14,
+  "台南": 15, "臺南": 15, "台南市": 15, "臺南市": 15,
+  "高雄": 17, "高雄市": 17,
+  "屏東": 19, "屏東縣": 19,
+  "宜蘭": 21, "宜蘭縣": 21,
+  "台東": 22, "臺東": 22, "台東縣": 22, "臺東縣": 22,
+  "花蓮": 23, "花蓮縣": 23,
+  "澎湖": 24, "澎湖縣": 24,
+  "金門": 25, "金門縣": 25,
+  "連江": 26, "連江縣": 26
+};
+/* regionid → 標準縣市名(給顯示用) */
+const REGION_NAME = {
+  1: "台北市", 2: "基隆市", 3: "新北市", 4: "新竹市", 5: "新竹縣", 6: "桃園市",
+  7: "苗栗縣", 8: "台中市", 10: "彰化縣", 11: "南投縣", 12: "雲林縣", 13: "嘉義市",
+  14: "嘉義縣", 15: "台南市", 17: "高雄市", 19: "屏東縣", 21: "宜蘭縣", 22: "台東縣",
+  23: "花蓮縣", 24: "澎湖縣", 25: "金門縣", 26: "連江縣"
+};
+const REGION_LIST = ["台北", "新北", "基隆", "桃園", "新竹", "苗栗", "台中", "彰化", "南投",
+  "雲林", "嘉義", "台南", "高雄", "屏東", "宜蘭", "台東", "花蓮", "澎湖", "金門", "連江"];
+/* 常見物件種別關鍵字(本地端用 includes 比對,如「透天」可命中「透天厝」) */
+const HOUSE_TYPES = ["透天", "公寓", "電梯大樓", "大樓", "華廈", "別墅", "套房", "店面", "廠房", "辦公", "土地", "車位"];
+
+/* 解析「縣市 [行政區…] [種別…] [N房] [總價萬]」→ 監看物件;縣市無法對應則回 null */
+function parseHouseWatch(text) {
+  const tokens = String(text || "").trim().split(/[\s,、，]+/).filter(Boolean);
+  if (!tokens.length) return null;
+
+  const regionId = REGION_ID[tokens[0]];
+  if (!regionId) return null;
+  tokens.shift();
+
+  const w = { region: REGION_NAME[regionId], regionId: regionId, districts: [], types: [], rooms: null, maxPrice: null };
+  for (const tok of tokens) {
+    let m;
+    if ((m = tok.match(/^(\d+(?:\.\d+)?)萬$/))) { w.maxPrice = Number(m[1]); continue; }
+    if ((m = tok.match(/^(\d+)房$/))) { w.rooms = Number(m[1]); continue; }
+    const ty = HOUSE_TYPES.find(x => tok.indexOf(x) >= 0);
+    if (ty) { if (w.types.indexOf(ty) < 0) w.types.push(ty); continue; }
+    /* 其餘一律當行政區/地點關鍵字(多個為 OR 比對) */
+    w.districts.push(tok.replace(/區$|鄉$|鎮$|市$/, ""));
+  }
+  return w;
+}
+
+/* 監看條件的可讀標題 */
+function watchLabel(w) {
+  const p = [w.region];
+  if (w.districts && w.districts.length) p.push(w.districts.join("/"));
+  if (w.types && w.types.length) p.push(w.types.join("/"));
+  if (w.rooms != null) p.push(w.rooms + "房");
+  if (w.maxPrice != null) p.push("≤" + w.maxPrice + "萬");
+  return p.join(" ");
+}
+
+/* 本地端過濾:空條件視為不限 */
+function matchWatch(l, w) {
+  if (w.maxPrice != null && !(l.price != null && l.price <= w.maxPrice)) return false;
+  if (w.rooms != null && !(l.rooms != null && l.rooms === w.rooms)) return false;
+  if (w.types && w.types.length) {
+    const kind = String(l.kind || "");
+    if (!w.types.some(x => kind.indexOf(x) >= 0)) return false;
+  }
+  if (w.districts && w.districts.length) {
+    const hay = String(l.address || "") + " " + String(l.section || "") + " " + String(l.title || "");
+    if (!w.districts.some(d => hay.indexOf(d) >= 0)) return false;
+  }
+  return true;
+}
+
+/* 把 Set-Cookie(可能多筆)整理成 "k=v; k=v" 的 Cookie 字串 */
+function collectCookies(res) {
+  let list = [];
+  if (typeof res.headers.getSetCookie === "function") list = res.headers.getSetCookie();
+  else { const one = res.headers.get("set-cookie"); if (one) list = [one]; }
+  return list.map(c => c.split(";")[0]).filter(Boolean).join("; ");
+}
+
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+/*
+ * 可替換來源層:向 591 售屋要「整個縣市」的銷售中清單。
+ * 591 有 bot 防護,需先取首頁 cookie + csrf-token 再打清單 API。
+ * 若之後被擋死,只要改寫這個函式(例如改抓你提供的 RSS/查詢網址)即可,其餘邏輯不動。
+ */
+async function fetch591Sale(regionId) {
+  const home = await fetch("https://sale.591.com.tw/", {
+    headers: { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml", "Accept-Language": "zh-TW,zh;q=0.9" }
+  });
+  if (!home.ok) throw new Error("連不上 591 首頁(HTTP " + home.status + ")");
+  const html = await home.text();
+  const cm = html.match(/name="csrf-token"\s+content="([^"]+)"/i);
+  const csrf = cm ? cm[1] : "";
+  const cookie = collectCookies(home);
+
+  const url = "https://sale.591.com.tw/home/search/rsList?shType=list&regionid=" + regionId +
+    "&order=posttime&orderType=desc&page=1";
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": UA,
+      "Accept": "application/json, text/plain, */*",
+      "X-CSRF-TOKEN": csrf,
+      "X-Requested-With": "XMLHttpRequest",
+      "Referer": "https://sale.591.com.tw/",
+      "Cookie": cookie
+    }
+  });
+  if (!res.ok) throw new Error("591 清單回應 HTTP " + res.status + "(可能被 bot 防護擋下)");
+  let j;
+  try { j = await res.json(); } catch (e) { throw new Error("591 回傳不是 JSON(可能被導到驗證頁)"); }
+  const raw = (j.data && (j.data.house_list || j.data.list || j.data.topData)) || [];
+
+  return raw.map(it => {
+    const id = String(it.id || it.house_id || it.houseid || it.post_id || "");
+    const priceNum = parseFloat(String(it.price != null ? it.price : it.total_price).replace(/[^\d.]/g, ""));
+    const roomNum = parseInt(String(it.room != null ? it.room : (it.layout || "")).replace(/[^\d]/g, ""), 10);
+    return {
+      id: id,
+      title: it.title || it.community || "(未命名物件)",
+      price: isNaN(priceNum) ? null : priceNum,               // 單位:萬
+      kind: it.kind_name || it.kind || it.houseType || "",
+      rooms: isNaN(roomNum) ? null : roomNum,
+      area: it.area || it.build_area || null,                 // 坪
+      section: it.section_name || it.sectionname || "",
+      address: it.address || ((it.region_name || "") + (it.section_name || "")),
+      url: id ? "https://sale.591.com.tw/home/house/detail/2/" + id + ".html" : "https://sale.591.com.tw/"
+    };
+  }).filter(x => x.id);
+}
+
+/* 取得某監看條件符合的物件(來源整縣市 → 本地過濾) */
+async function fetchListings(watch) {
+  const all = await fetch591Sale(watch.regionId);
+  return all.filter(l => matchWatch(l, watch));
+}
+
+/* 把物件清單做成 Flex 卡片(附「查看物件」按鈕) */
+function flexListings(label, items) {
+  const body = [{ type: "text", text: "🏠 " + label, weight: "bold", size: "md", wrap: true },
+    { type: "text", text: items.length + " 筆新物件", size: "xs", color: "#999999", margin: "xs" }];
+  items.forEach((it, i) => {
+    body.push({ type: "text", text: (i + 1) + ". " + it.title, weight: "bold", size: "sm", wrap: true, margin: "md" });
+    const meta = [];
+    if (it.price != null) meta.push("💰 " + it.price + "萬");
+    if (it.kind) meta.push(it.kind);
+    if (it.rooms != null) meta.push(it.rooms + "房");
+    if (it.area) meta.push(it.area + "坪");
+    if (meta.length) body.push({ type: "text", text: meta.join("　"), size: "xs", color: "#666666" });
+    if (it.address) body.push({ type: "text", text: "📍 " + it.address, size: "xs", color: "#999999", wrap: true });
+    if (it.url) body.push({ type: "button", style: "link", height: "sm",
+      action: { type: "uri", label: "🏠 查看物件", uri: it.url } });
+  });
+  return { type: "flex", altText: "🏠 " + label + " 新物件",
+    contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", spacing: "none", contents: body } } };
+}
+
+/* Cron:逐筆監看條件查詢,只推播尚未通知過的新物件 */
+async function checkHouseWatches(env) {
+  const userId = await env.TODO_KV.get("line_user_id");
+  if (!userId) return;
+  const watches = (await env.TODO_KV.get("house_watches", "json")) || [];
+  if (!Array.isArray(watches) || !watches.length) return;
+
+  for (const w of watches) {
+    let items;
+    try { items = await fetchListings(w); }
+    catch (e) { continue; }   // 單筆查詢失敗就略過,不影響其他條件
+
+    const seenKey = "house_seen:" + w.id;
+    let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
+    if (!Array.isArray(seen)) seen = [];
+    const ttl = { expirationTtl: 60 * 60 * 24 * 30 };
+
+    /* 第一次:只記錄目前物件,不推播(避免一次灌爆),之後才通知新物件 */
+    if (!seen.length) {
+      if (items.length) await env.TODO_KV.put(seenKey, JSON.stringify(items.map(it => it.id).slice(-300)), ttl);
+      continue;
+    }
+    const seenSet = new Set(seen);
+    const fresh = items.filter(it => !seenSet.has(it.id));
+    if (!fresh.length) continue;
+    await linePush(userId, [flexListings(watchLabel(w), fresh.slice(0, 10))], env.LINE_CHANNEL_ACCESS_TOKEN);
+    const merged = seen.concat(fresh.map(it => it.id)).slice(-300);
+    await env.TODO_KV.put(seenKey, JSON.stringify(merged), ttl);
+  }
 }
 
 const HTML = `<!DOCTYPE html>
