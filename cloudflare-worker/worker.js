@@ -134,8 +134,14 @@ async function handleLine(request, env, ctx) {
           if (prev !== ev.source.userId) await env.TODO_KV.put("line_user_id", ev.source.userId);
         }
         try {
-          const replyText = await processLineCommand(ev.message.text, env);
-          if (replyText) await lineReply(ev.replyToken, replyText, env.LINE_CHANNEL_ACCESS_TOKEN);
+          const result = await processLineCommand(ev.message.text, env);
+          if (result && typeof result === "object" && !Array.isArray(result) && result.type === undefined && result.ack !== undefined) {
+            /* 慢指令(找房):先秒回 ack,結果由 background 用 push 送 */
+            if (result.ack) await lineReply(ev.replyToken, result.ack, env.LINE_CHANNEL_ACCESS_TOKEN);
+            if (typeof result.background === "function") await result.background();
+          } else if (result) {
+            await lineReply(ev.replyToken, result, env.LINE_CHANNEL_ACCESS_TOKEN);
+          }
         } catch (e) {
           /* 任何例外都回一則可讀訊息,不要讓使用者面對「完全沒反應」 */
           try { await lineReply(ev.replyToken, "⚠️ 發生錯誤:" + (e && e.message ? e.message : e), env.LINE_CHANNEL_ACCESS_TOKEN); } catch (_) {}
@@ -414,23 +420,30 @@ async function processLineCommand(text, env) {
     if (!Array.isArray(watches) || !watches.length) {
       return "目前沒有房屋監看條件。\n新增範例:\n房屋 : 高雄 三民 左營 透天 2000萬";
     }
-    const messages = [];
-    for (const w of watches) {
-      try {
-        const items = await fetchListings(w, env);
-        /* 記住目前這批,之後 Cron 只通知比這更新的物件 */
-        const seenKey = "house_seen:" + w.id;
-        let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
-        if (!Array.isArray(seen)) seen = [];
-        const merged = Array.from(new Set(seen.concat(items.map(it => it.id)))).slice(-300);
-        await env.TODO_KV.put(seenKey, JSON.stringify(merged), { expirationTtl: 60 * 60 * 24 * 30 });
-        if (!items.length) messages.push("🏠 " + watchLabel(w) + "\n目前沒有符合的物件。");
-        else messages.push(textListings(watchLabel(w), items.slice(0, 10)));
-      } catch (e) {
-        messages.push("⚠️ " + watchLabel(w) + "\n查詢失敗:" + (e && e.message ? e.message : e));
+    /* 搜尋(尤其走 proxy)較慢,replyToken 會過期。先秒回「搜尋中」,結果用 push 送 */
+    return {
+      ack: "🔍 搜尋中,約 10~40 秒後把結果傳給你…",
+      background: async () => {
+        const userId = await env.TODO_KV.get("line_user_id");
+        const messages = [];
+        for (const w of watches) {
+          try {
+            const items = await fetchListings(w, env);
+            /* 記住目前這批,之後 Cron 只通知比這更新的物件 */
+            const seenKey = "house_seen:" + w.id;
+            let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
+            if (!Array.isArray(seen)) seen = [];
+            const merged = Array.from(new Set(seen.concat(items.map(it => it.id)))).slice(-300);
+            await env.TODO_KV.put(seenKey, JSON.stringify(merged), { expirationTtl: 60 * 60 * 24 * 30 });
+            if (!items.length) messages.push("🏠 " + watchLabel(w) + "\n目前沒有符合的物件。");
+            else messages.push(textListings(watchLabel(w), items.slice(0, 10)));
+          } catch (e) {
+            messages.push("⚠️ " + watchLabel(w) + "\n查詢失敗:" + (e && e.message ? e.message : e));
+          }
+        }
+        if (userId && messages.length) await linePush(userId, messages.slice(0, 5), env.LINE_CHANNEL_ACCESS_TOKEN);
       }
-    }
-    return messages.length ? messages.slice(0, 5) : "🏠 查無結果,請稍後再試。";
+    };
   }
 
   /* 手動測試每日摘要推播 */
@@ -856,7 +869,7 @@ async function proxiedFetch(targetUrl, env) {
   if (env && env.SCRAPER_API_KEY) {
     const api = "https://api.scraperapi.com/?api_key=" + encodeURIComponent(env.SCRAPER_API_KEY) +
       "&country_code=tw&url=" + encodeURIComponent(targetUrl);
-    return fetch(api, { signal: timeoutSig(50000) });   // 走 proxy 較慢,逾時放寬到 50 秒
+    return fetch(api, { signal: timeoutSig(25000) });   // 走 proxy 較慢,但要留在背景任務時限內,逾時設 25 秒
   }
   return fetch(targetUrl, {
     redirect: "manual",
