@@ -834,7 +834,7 @@ function matchWatch(l, w) {
   if (w.maxPrice != null && !(l.price != null && l.price <= w.maxPrice)) return false;
   if (w.rooms != null && !(l.rooms != null && l.rooms === w.rooms)) return false;
   if (w.types && w.types.length) {
-    const kind = String(l.kind || "");
+    const kind = String(l.kind || "") + " " + String(l.title || "");
     if (!w.types.some(x => kind.indexOf(x) >= 0)) return false;
   }
   if (w.districts && w.districts.length) {
@@ -941,9 +941,65 @@ async function fetch591Sale(regionId) {
   }).filter(x => x.id);
 }
 
+/* 樂屋網縣市代碼(0–20,與 591 不同)。查詢只給縣市,行政區/種別在本地過濾 */
+const RAKUYA_CITY = {
+  "基隆市": 0, "台北市": 1, "新北市": 2, "宜蘭縣": 3, "桃園市": 4, "新竹市": 5, "新竹縣": 6,
+  "苗栗縣": 7, "台中市": 8, "彰化縣": 9, "南投縣": 10, "雲林縣": 11, "嘉義市": 12, "嘉義縣": 13,
+  "台南市": 14, "高雄市": 15, "屏東縣": 16, "台東縣": 17, "花蓮縣": 18, "澎湖縣": 19, "金門縣": 20
+};
+
+/*
+ * 來源層(樂屋網售屋):以「縣市」取銷售中清單。樂屋網是 SSR HTML,直接解析卡片。
+ * 若被擋或改版,只要改寫這個函式(或換回 fetch591Sale / 你的 RSS)即可,其餘邏輯不動。
+ */
+async function fetchRakuyaSale(regionName) {
+  const city = RAKUYA_CITY[regionName];
+  if (city === undefined) throw new Error("樂屋網不支援此縣市:" + regionName);
+  const url = "https://www.rakuya.com.tw/sell/result?city=" + city + "&sort=30&page=1";
+  const res = await fetch(url, {
+    redirect: "manual",
+    signal: timeoutSig(),
+    headers: {
+      "User-Agent": UA,
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "zh-TW,zh;q=0.9",
+      "Referer": "https://www.rakuya.com.tw/sell"
+    }
+  });
+  if (!res.ok) throw new Error("樂屋網回應 HTTP " + res.status + "(可能擋雲端 IP)");
+  const html = await res.text();
+  const blocks = html.match(/<section[^>]*>[\s\S]*?<\/section>/g) || [];
+  const clean = s => String(s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  const out = [];
+  for (const b of blocks) {
+    const eh = b.match(/data-ehid="([^"]+)"/);
+    if (!eh) continue;
+    const ehid = eh[1];
+    const title = clean((b.match(/<div class="card__head">\s*<h2>(.+?)<\/h2>/s) || [])[1]) || "(未命名物件)";
+    const priceRaw = (b.match(/<span class="info__price--total">\s*<b>(.+?)<\/b>/s) || [])[1] || "";
+    const community = clean((b.match(/<span class="info__geo--community"[^>]*>([^<]+)<\/span>/) || [])[1]);
+    const road = clean((b.match(/<span class="info__geo--road">(.+?)<\/span>/s) || [])[1]);
+    const areaRaw = clean((b.match(/<span class="info__space--title">總建<\/span>(.+?)坪/s) || [])[1]);
+    const priceNum = parseFloat(String(priceRaw).replace(/<[^>]+>/g, "").replace(/[^\d.]/g, ""));
+    const roomsM = title.match(/(\d+)\s*房/);
+    out.push({
+      id: ehid,
+      title: title,
+      price: isNaN(priceNum) ? null : priceNum,      // 單位:萬
+      kind: "",
+      rooms: roomsM ? +roomsM[1] : null,
+      area: areaRaw || null,                          // 坪
+      section: "",
+      address: (community + " " + road).trim(),
+      url: "https://www.rakuya.com.tw/sell/item/info?ehid=" + ehid
+    });
+  }
+  return out;
+}
+
 /* 取得某監看條件符合的物件(來源整縣市 → 本地過濾) */
 async function fetchListings(watch) {
-  const all = await fetch591Sale(watch.regionId);
+  const all = await fetchRakuyaSale(watch.region);
   return all.filter(l => matchWatch(l, watch));
 }
 
