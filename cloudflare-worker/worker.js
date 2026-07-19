@@ -26,7 +26,7 @@
  */
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/") {
       return new Response(HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
@@ -35,7 +35,7 @@ export default {
       return handleApi(request, env);
     }
     if (url.pathname === "/line") {
-      return handleLine(request, env);
+      return handleLine(request, env, ctx);
     }
     return new Response("Not found", { status: 404 });
   },
@@ -111,7 +111,7 @@ async function handleApi(request, env) {
 
 /* ---------------- LINE bot ---------------- */
 
-async function handleLine(request, env) {
+async function handleLine(request, env, ctx) {
   if (request.method !== "POST") return new Response("ok");
   const bodyText = await request.text();
 
@@ -123,17 +123,30 @@ async function handleLine(request, env) {
   try { body = JSON.parse(bodyText); } catch (e) { body = {}; }
   const events = body.events || [];
 
-  for (const ev of events) {
-    if (ev.type === "message" && ev.message && ev.message.type === "text" && ev.replyToken) {
-      /* 記住使用者 ID,自動推播用 */
-      if (ev.source && ev.source.userId) {
-        const prev = await env.TODO_KV.get("line_user_id");
-        if (prev !== ev.source.userId) await env.TODO_KV.put("line_user_id", ev.source.userId);
+  /* 先立刻回 200 給 LINE(避免慢指令如「找房」拖到 replyToken 失效導致完全沒回覆),
+     實際處理與回覆丟到背景用 ctx.waitUntil 執行 */
+  const work = (async () => {
+    for (const ev of events) {
+      if (ev.type === "message" && ev.message && ev.message.type === "text" && ev.replyToken) {
+        /* 記住使用者 ID,自動推播用 */
+        if (ev.source && ev.source.userId) {
+          const prev = await env.TODO_KV.get("line_user_id");
+          if (prev !== ev.source.userId) await env.TODO_KV.put("line_user_id", ev.source.userId);
+        }
+        try {
+          const replyText = await processLineCommand(ev.message.text, env);
+          if (replyText) await lineReply(ev.replyToken, replyText, env.LINE_CHANNEL_ACCESS_TOKEN);
+        } catch (e) {
+          /* 任何例外都回一則可讀訊息,不要讓使用者面對「完全沒反應」 */
+          try { await lineReply(ev.replyToken, "⚠️ 發生錯誤:" + (e && e.message ? e.message : e), env.LINE_CHANNEL_ACCESS_TOKEN); } catch (_) {}
+        }
       }
-      const replyText = await processLineCommand(ev.message.text, env);
-      if (replyText) await lineReply(ev.replyToken, replyText, env.LINE_CHANNEL_ACCESS_TOKEN);
     }
-  }
+  })();
+
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(work);
+  else await work;
+
   return new Response("ok");
 }
 
@@ -847,7 +860,9 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
  * 若之後被擋死,只要改寫這個函式(例如改抓你提供的 RSS/查詢網址)即可,其餘邏輯不動。
  */
 async function fetch591Sale(regionId) {
+  const timeout = () => (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined;
   const home = await fetch("https://sale.591.com.tw/", {
+    signal: timeout(),
     headers: { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml", "Accept-Language": "zh-TW,zh;q=0.9" }
   });
   if (!home.ok) throw new Error("連不上 591 首頁(HTTP " + home.status + ")");
@@ -859,6 +874,7 @@ async function fetch591Sale(regionId) {
   const url = "https://sale.591.com.tw/home/search/list?type=2&shType=list&regionid=" + regionId +
     "&order=posttime_desc&firstRow=0";
   const res = await fetch(url, {
+    signal: timeout(),
     headers: {
       "User-Agent": UA,
       "Accept": "application/json, text/plain, */*",
