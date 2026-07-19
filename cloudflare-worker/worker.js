@@ -822,7 +822,7 @@ function parseHouseWatch(text) {
   const w = { region: REGION_NAME[regionId], regionId: regionId, districts: [], types: [], rooms: null, maxPrice: null };
   for (const tok of tokens) {
     let m;
-    if ((m = tok.match(/^(\d+(?:\.\d+)?)萬$/))) { w.maxPrice = Number(m[1]); continue; }
+    if ((m = tok.match(/^(\d+(?:\.\d+)?)\s*萬(?:元)?(?:以內|以下|內)?$/))) { w.maxPrice = Number(m[1]); continue; }
     if ((m = tok.match(/^(\d+)房$/))) { w.rooms = Number(m[1]); continue; }
     const ty = HOUSE_TYPES.find(x => tok.indexOf(x) >= 0);
     if (ty) { if (w.types.indexOf(ty) < 0) w.types.push(ty); continue; }
@@ -1096,10 +1096,23 @@ async function fetch591Mobile(watch, env) {
   }).filter(x => x.id);
 }
 
-/* 取得某監看條件符合的物件(伺服器端 region+section+price → 本地再篩種別/房數/區名) */
+/* 去重:同一物件常被貼多筆(id 不同但內容相同)。用 標題+價格+地址+坪數 當指紋,只留第一筆 */
+function dedupeListings(items) {
+  const seen = new Set();
+  const out = [];
+  for (const it of items) {
+    const key = [it.title, it.price, it.address, it.area].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return out;
+}
+
+/* 取得某監看條件符合的物件(伺服器端 region+section+price → 本地再篩種別/房數/區名 → 去重) */
 async function fetchListings(watch, env) {
   const all = await fetch591Mobile(watch, env);
-  return all.filter(l => matchWatch(l, watch));
+  return dedupeListings(all.filter(l => matchWatch(l, watch)));
 }
 
 /* 把物件清單做成純文字(最穩,一定送得出去;每筆附連結) */
