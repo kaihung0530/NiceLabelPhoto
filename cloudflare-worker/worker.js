@@ -417,7 +417,7 @@ async function processLineCommand(text, env) {
     const messages = [];
     for (const w of watches) {
       try {
-        const items = await fetchListings(w);
+        const items = await fetchListings(w, env);
         /* 記住目前這批,之後 Cron 只通知比這更新的物件 */
         const seenKey = "house_seen:" + w.id;
         let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
@@ -845,7 +845,30 @@ function matchWatch(l, w) {
 }
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const timeoutSig = () => (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined;
+const timeoutSig = (ms) => (typeof AbortSignal !== "undefined" && AbortSignal.timeout) ? AbortSignal.timeout(ms || 8000) : undefined;
+
+/*
+ * 取網頁:若有設定 SCRAPER_API_KEY 就走 ScraperAPI(住宅/台灣 IP,繞開 591/樂屋的雲端 IP 封鎖);
+ * 沒設就直接連(多半會被擋,但不影響待辦/日曆——那些不會呼叫這裡)。
+ * 這是「選用」設計:加不加 key 都不會動到其他功能。
+ */
+async function proxiedFetch(targetUrl, env) {
+  if (env && env.SCRAPER_API_KEY) {
+    const api = "https://api.scraperapi.com/?api_key=" + encodeURIComponent(env.SCRAPER_API_KEY) +
+      "&country_code=tw&url=" + encodeURIComponent(targetUrl);
+    return fetch(api, { signal: timeoutSig(50000) });   // 走 proxy 較慢,逾時放寬到 50 秒
+  }
+  return fetch(targetUrl, {
+    redirect: "manual",
+    signal: timeoutSig(8000),
+    headers: {
+      "User-Agent": UA,
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "zh-TW,zh;q=0.9",
+      "Referer": "https://www.rakuya.com.tw/sell"
+    }
+  });
+}
 
 /* 把某回應的 Set-Cookie 併入 cookie jar(物件:名稱→值) */
 function mergeSetCookie(jar, res) {
@@ -952,21 +975,15 @@ const RAKUYA_CITY = {
  * 來源層(樂屋網售屋):以「縣市」取銷售中清單。樂屋網是 SSR HTML,直接解析卡片。
  * 若被擋或改版,只要改寫這個函式(或換回 fetch591Sale / 你的 RSS)即可,其餘邏輯不動。
  */
-async function fetchRakuyaSale(regionName) {
+async function fetchRakuyaSale(regionName, env) {
   const city = RAKUYA_CITY[regionName];
   if (city === undefined) throw new Error("樂屋網不支援此縣市:" + regionName);
   const url = "https://www.rakuya.com.tw/sell/result?city=" + city + "&sort=30&page=1";
-  const res = await fetch(url, {
-    redirect: "manual",
-    signal: timeoutSig(),
-    headers: {
-      "User-Agent": UA,
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "zh-TW,zh;q=0.9",
-      "Referer": "https://www.rakuya.com.tw/sell"
-    }
-  });
-  if (!res.ok) throw new Error("樂屋網回應 HTTP " + res.status + "(可能擋雲端 IP)");
+  const res = await proxiedFetch(url, env);
+  if (!res.ok) {
+    const viaProxy = env && env.SCRAPER_API_KEY;
+    throw new Error("樂屋網回應 HTTP " + res.status + (viaProxy ? "(已透過 proxy,仍失敗)" : "(可能擋雲端 IP,建議設 SCRAPER_API_KEY)"));
+  }
   const html = await res.text();
   const blocks = html.match(/<section[^>]*>[\s\S]*?<\/section>/g) || [];
   const clean = s => String(s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
@@ -998,8 +1015,8 @@ async function fetchRakuyaSale(regionName) {
 }
 
 /* 取得某監看條件符合的物件(來源整縣市 → 本地過濾) */
-async function fetchListings(watch) {
-  const all = await fetchRakuyaSale(watch.region);
+async function fetchListings(watch, env) {
+  const all = await fetchRakuyaSale(watch.region, env);
   return all.filter(l => matchWatch(l, watch));
 }
 
@@ -1050,7 +1067,7 @@ async function checkHouseWatches(env) {
 
   for (const w of watches) {
     let items;
-    try { items = await fetchListings(w); }
+    try { items = await fetchListings(w, env); }
     catch (e) { continue; }   // 單筆查詢失敗就略過,不影響其他條件
 
     const seenKey = "house_seen:" + w.id;
