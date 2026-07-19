@@ -854,8 +854,8 @@ async function fetch591Sale(regionId) {
   const csrf = cm ? cm[1] : "";
   const cookie = collectCookies(home);
 
-  const url = "https://sale.591.com.tw/home/search/rsList?shType=list&regionid=" + regionId +
-    "&order=posttime&orderType=desc&page=1";
+  const url = "https://sale.591.com.tw/home/search/list?type=2&shType=list&regionid=" + regionId +
+    "&order=posttime_desc&firstRow=0";
   const res = await fetch(url, {
     headers: {
       "User-Agent": UA,
