@@ -1031,9 +1031,45 @@ async function fetchRakuyaSale(regionName, env) {
   return out;
 }
 
+/*
+ * 來源層(591 清單,單次走 proxy):591 清單是輕量 JSON,單次抓比樂屋 HTML 快、
+ * 較可能塞進 Worker 30 秒上限。跳過首頁 csrf 兩步——賭 residential IP 單次就能過;
+ * 若 591 仍要 csrf 會回 404 或非 JSON,錯誤訊息會標明。
+ */
+async function fetch591Proxy(regionId, env) {
+  const url = "https://sale.591.com.tw/home/search/list?type=2&shType=list&regionid=" + regionId +
+    "&order=posttime_desc&firstRow=0";
+  const res = await proxiedFetch(url, env);
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140); } catch (_) {}
+    throw new Error("591 清單回應 HTTP " + res.status +
+      (env && env.SCRAPER_API_KEY ? "(已透過 proxy)" : "") + (detail ? " — " + detail : ""));
+  }
+  let j;
+  try { j = await res.json(); } catch (e) { throw new Error("591 回傳非 JSON(可能仍需 csrf/被導驗證頁)"); }
+  const raw = (j.data && (j.data.house_list || j.data.list || j.data.topData)) || [];
+  return raw.map(it => {
+    const id = String(it.id || it.house_id || it.houseid || it.post_id || "");
+    const priceNum = parseFloat(String(it.price != null ? it.price : it.total_price).replace(/[^\d.]/g, ""));
+    const roomNum = parseInt(String(it.room != null ? it.room : (it.layout || "")).replace(/[^\d]/g, ""), 10);
+    return {
+      id: id,
+      title: it.title || it.community || "(未命名物件)",
+      price: isNaN(priceNum) ? null : priceNum,               // 單位:萬
+      kind: it.kind_name || it.kind || it.houseType || "",
+      rooms: isNaN(roomNum) ? null : roomNum,
+      area: it.area || it.build_area || null,                 // 坪
+      section: it.section_name || it.sectionname || "",
+      address: it.address || ((it.region_name || "") + (it.section_name || "")),
+      url: id ? "https://sale.591.com.tw/home/house/detail/2/" + id + ".html" : "https://sale.591.com.tw/"
+    };
+  }).filter(x => x.id);
+}
+
 /* 取得某監看條件符合的物件(來源整縣市 → 本地過濾) */
 async function fetchListings(watch, env) {
-  const all = await fetchRakuyaSale(watch.region, env);
+  const all = await fetch591Proxy(watch.regionId, env);
   return all.filter(l => matchWatch(l, watch));
 }
 
