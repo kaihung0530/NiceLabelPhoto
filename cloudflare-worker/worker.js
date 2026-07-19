@@ -403,19 +403,21 @@ async function processLineCommand(text, env) {
     }
     const messages = [];
     for (const w of watches) {
-      let items;
-      try { items = await fetchListings(w); }
-      catch (e) { messages.push("⚠️ " + watchLabel(w) + "\n查詢失敗:" + e.message); continue; }
-      /* 記住目前這批,之後 Cron 只通知比這更新的物件 */
-      const seenKey = "house_seen:" + w.id;
-      let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
-      if (!Array.isArray(seen)) seen = [];
-      const merged = Array.from(new Set(seen.concat(items.map(it => it.id)))).slice(-300);
-      await env.TODO_KV.put(seenKey, JSON.stringify(merged), { expirationTtl: 60 * 60 * 24 * 30 });
-      if (!items.length) messages.push("🏠 " + watchLabel(w) + "\n目前沒有符合的物件。");
-      else messages.push(flexListings(watchLabel(w), items.slice(0, 10)));
+      try {
+        const items = await fetchListings(w);
+        /* 記住目前這批,之後 Cron 只通知比這更新的物件 */
+        const seenKey = "house_seen:" + w.id;
+        let seen = (await env.TODO_KV.get(seenKey, "json")) || [];
+        if (!Array.isArray(seen)) seen = [];
+        const merged = Array.from(new Set(seen.concat(items.map(it => it.id)))).slice(-300);
+        await env.TODO_KV.put(seenKey, JSON.stringify(merged), { expirationTtl: 60 * 60 * 24 * 30 });
+        if (!items.length) messages.push("🏠 " + watchLabel(w) + "\n目前沒有符合的物件。");
+        else messages.push(textListings(watchLabel(w), items.slice(0, 10)));
+      } catch (e) {
+        messages.push("⚠️ " + watchLabel(w) + "\n查詢失敗:" + (e && e.message ? e.message : e));
+      }
     }
-    return messages.slice(0, 5);
+    return messages.length ? messages.slice(0, 5) : "🏠 查無結果,請稍後再試。";
   }
 
   /* 手動測試每日摘要推播 */
@@ -895,6 +897,24 @@ async function fetchListings(watch) {
   return all.filter(l => matchWatch(l, watch));
 }
 
+/* 把物件清單做成純文字(最穩,一定送得出去;每筆附連結) */
+function textListings(label, items) {
+  const lines = ["🏠 " + label + "(" + items.length + " 筆)"];
+  items.forEach((it, i) => {
+    lines.push("");
+    lines.push((i + 1) + ". " + String(it.title || "(未命名物件)"));
+    const meta = [];
+    if (it.price != null) meta.push("💰" + it.price + "萬");
+    if (it.kind) meta.push(String(it.kind));
+    if (it.rooms != null) meta.push(it.rooms + "房");
+    if (it.area) meta.push(it.area + "坪");
+    if (meta.length) lines.push("　" + meta.join("　"));
+    if (it.address) lines.push("　📍" + String(it.address));
+    if (it.url) lines.push("　" + it.url);
+  });
+  return lines.join("\n");
+}
+
 /* 把物件清單做成 Flex 卡片(附「查看物件」按鈕) */
 function flexListings(label, items) {
   const body = [{ type: "text", text: "🏠 " + label, weight: "bold", size: "md", wrap: true },
@@ -940,7 +960,7 @@ async function checkHouseWatches(env) {
     const seenSet = new Set(seen);
     const fresh = items.filter(it => !seenSet.has(it.id));
     if (!fresh.length) continue;
-    await linePush(userId, [flexListings(watchLabel(w), fresh.slice(0, 10))], env.LINE_CHANNEL_ACCESS_TOKEN);
+    await linePush(userId, textListings(watchLabel(w), fresh.slice(0, 10)), env.LINE_CHANNEL_ACCESS_TOKEN);
     const merged = seen.concat(fresh.map(it => it.id)).slice(-300);
     await env.TODO_KV.put(seenKey, JSON.stringify(merged), ttl);
   }
