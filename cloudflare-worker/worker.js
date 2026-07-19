@@ -867,9 +867,19 @@ const timeoutSig = (ms) => (typeof AbortSignal !== "undefined" && AbortSignal.ti
  */
 async function proxiedFetch(targetUrl, env) {
   if (env && env.SCRAPER_API_KEY) {
+    /* keep_headers=true:把下面的 XHR 標頭轉發給目標(591 的清單 API 需要 X-Requested-With 才回 JSON) */
     const api = "https://api.scraperapi.com/?api_key=" + encodeURIComponent(env.SCRAPER_API_KEY) +
-      "&premium=true&url=" + encodeURIComponent(targetUrl);
-    return fetch(api, { signal: timeoutSig(28000) });   // 住宅 IP 通常一次就成功、較快;逾時 28 秒(留在背景任務時限內)
+      "&premium=true&keep_headers=true&url=" + encodeURIComponent(targetUrl);
+    return fetch(api, {
+      signal: timeoutSig(28000),   // 住宅 IP 通常一次就成功;逾時 28 秒(留在背景任務時限內)
+      headers: {
+        "User-Agent": UA,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-TW,zh;q=0.9",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://sale.591.com.tw/"
+      }
+    });
   }
   return fetch(targetUrl, {
     redirect: "manual",
