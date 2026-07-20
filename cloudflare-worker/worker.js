@@ -40,17 +40,15 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 
-  /* Cron 觸發:早安摘要(一天一次)+ 房屋新著檢查(每次都跑) */
+  /* Cron 觸發:依 event.cron 分流
+     - "30 1 * * 1"  = 每週一 UTC01:30(台灣週一 09:30)→ 房屋新著檢查(一週一次,省 ScraperAPI 額度)
+     - 其他(預設 "0 1 * * *" = 每天 UTC01:00 = 台灣 09:00)→ 早安摘要(待辦+今日行程) */
   async scheduled(event, env, ctx) {
-    /* 早安摘要每天只發一次:即使把 Cron 設成每數小時一次(為了勤跑房屋檢查),也不會洗版 */
-    const today = twToday();
-    const lastDigest = await env.TODO_KV.get("digest_sent_date");
-    if (lastDigest !== today) {
-      const ok = await sendDailyDigest(env);
-      if (ok) await env.TODO_KV.put("digest_sent_date", today);
+    if (event && event.cron === "30 1 * * 1") {
+      try { await checkHouseWatches(env); } catch (e) { /* 房屋檢查失敗不影響其他 */ }
+    } else {
+      try { await sendDailyDigest(env); } catch (e) { /* 摘要失敗不影響其他 */ }
     }
-    /* 房屋新著:每次排程都檢查,有新物件才推播 */
-    try { await checkHouseWatches(env); } catch (e) { /* 檢查失敗不影響其他排程 */ }
   }
 };
 
