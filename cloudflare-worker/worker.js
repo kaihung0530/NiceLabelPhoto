@@ -847,8 +847,13 @@ function matchWatch(l, w) {
   if (w.maxPrice != null && !(l.price != null && l.price <= w.maxPrice)) return false;
   if (w.rooms != null && !(l.rooms != null && l.rooms === w.rooms)) return false;
   if (w.types && w.types.length) {
-    const kind = String(l.kind || "") + " " + String(l.title || "");
-    if (!w.types.some(x => kind.indexOf(x) >= 0)) return false;
+    /* 有對到 shape 代碼的型態(透天/公寓/大樓/別墅)已由伺服器端 shape_str 篩掉,不必再本地比對
+       (否則會誤刪標題沒寫型態的物件);只本地比對對不到 shape 的型態(店面/套房/土地…) */
+    const localTypes = w.types.filter(x => SHAPE_ID[x] === undefined);
+    if (localTypes.length) {
+      const kind = String(l.kind || "") + " " + String(l.title || "");
+      if (!localTypes.some(x => kind.indexOf(x) >= 0)) return false;
+    }
   }
   if (w.districts && w.districts.length) {
     const hay = String(l.address || "") + " " + String(l.section || "") + " " + String(l.title || "");
@@ -1038,6 +1043,9 @@ function randHex(n) {
   let s = ""; while (s.length < n) s += Math.floor(Math.random() * 16).toString(16); return s.slice(0, n);
 }
 
+/* 建物型態 → 591 shape 代碼。有對到就伺服器端 shape_str 篩選(不會漏掉標題沒寫型態的) */
+const SHAPE_ID = { "公寓": 1, "電梯大樓": 2, "大樓": 2, "華廈": 2, "透天": 3, "別墅": 4 };
+
 /* 591 行政區代碼(名稱去掉 區/鄉/鎮 後對應 sectionid)。有對到就伺服器端精準篩選 */
 const SECTION_ID = {
   1: { 中正: 1, 大同: 2, 中山: 3, 松山: 4, 大安: 5, 萬華: 6, 信義: 7, 士林: 8, 北投: 9, 內湖: 10, 南港: 11, 文山: 12 },
@@ -1056,6 +1064,9 @@ async function fetch591Mobile(watch, env) {
   if (secIds.length) url += "&sectionidStr=" + secIds.join(",");
   /* 總價上限(萬):$_<max>$ */
   if (watch.maxPrice != null) url += "&price_str=$_" + watch.maxPrice + "$";
+  /* 建物型態 → shape_str(1公寓 2電梯大樓 3透天 4別墅);對不到的型態(店面/套房…)留給本地過濾 */
+  const shapeIds = (watch.types || []).map(t => SHAPE_ID[t]).filter(Boolean);
+  if (shapeIds.length) url += "&shape_str=" + Array.from(new Set(shapeIds)).join(",");
   const headers = {
     "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
     "Accept": "application/json, text/plain, */*",
