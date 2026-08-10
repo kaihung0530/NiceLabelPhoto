@@ -27,9 +27,10 @@ const char*    WIFI_PASSWORD   = "bw16112945";
 const char*    SCRIPT_URL      = "https://script.google.com/macros/s/AKfycbyfbxCY7N1-mqkVWKE4QZVmGgxkNzABQS2aIftCU86pHb6A6vWceoewkL2pGazcyZVA/exec";  // 結尾是 /exec
 const uint64_t REFRESH_MINUTES = 1;                  // 每幾分鐘檢查一次（插電可設短，如 5）
 
-/* 農曆：顯示在日期數字右邊。
-   ★ 會用到「初 廿 正 閏 七 八 九 十」這些字，TradFont.h 若沒收就畫不出來，
-     程式會自動偵測（u8g2 對缺字回傳 0 寬度）並退回顯示阿拉伯數字，不會變成空白。 */
+/* 農曆：顯示在日期數字右邊，用 trad14 畫。
+   已解析過 TradFont.h：trad14 收了 21172 個字（完整 CJK），
+   農曆用到的「初 廿 正 閏 七 八 九 十」全都有，會正常顯示中文。
+   （程式仍留有缺字自動退回阿拉伯數字的保護，換字型時才會用到） */
 const bool SHOW_LUNAR = true;
 
 /* ========== 螢幕腳位（ESP32 Driver Board 固定，照抄） ========== */
@@ -193,10 +194,12 @@ int daysInMonth(int y, int m){
 /* 畫字。bold=true 時同一行畫兩次、右移 1px，讓點陣字筆劃變粗（電子紙上好讀很多）
 
    ★ setFontMode(1) = 透明模式，每次畫字都要重設，不能只在 setup() 設一次：
-     u8g2 的字身外框（trad14 約 18px）比實際筆劃高，非透明模式下會連外框一起
-     填背景色，行距 16px 時「下一行的外框」就會把「上一行的字底」蓋掉
+     trad14 是 BBX Build Mode 1，字身外框固定 20px（基線上 17、下 3），
+     但實際筆劃只有 13px（基線上 12、下 1）。非透明模式會連外框一起填背景色，
+     行距 16px 時外框重疊 4px，「下一行的外框」就把「上一行的字底」蓋掉
      —— 症狀是 0 變成 n、1 變成 7，而且每格最後一行不會被蓋（後面沒東西了）。
-     三行在 68px 格高裡外框一定會重疊，所以透明模式是必要的，不是可選的。 */
+     原本行距 18 剛好只重疊 2px、沒吃到墨水，所以兩行版本看不出問題。
+     三行在 68px 格高裡外框一定重疊，所以透明模式是必要條件，不是可選的。 */
 void drawText(int x, int y, const String& s, uint16_t color,
               uint16_t bg = GxEPD_WHITE, bool bold = true){
   u8g2Fonts.setFontMode(1);                  // 只畫筆劃，不填背景框

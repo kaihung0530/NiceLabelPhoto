@@ -34,8 +34,11 @@ EV = {4:[("09:00 BLC會議",0),("14:00 參展會議",0),("16:00 產品討論",0)
       19:[("> 自動化設…",0),("18:00 [SOTI…",0)], 20:[("> 自動化設…",0)]}
 MORE={18:1}; TODAY=7
 import csv
-LUNAR={int(r[0][8:]):r[5] for r in csv.reader(open('test/cpp_out.csv')) if r[0].startswith('2026-08')}
-print("  農曆 2026/8:", " ".join(f"{k}={v}" for k,v in sorted(LUNAR.items())[:6]), "...")
+try:   # 農曆標籤來自 test/lunar_test 的輸出，沒產過就先跳過，不影響版面檢查
+    LUNAR={int(r[0][8:]):r[5] for r in csv.reader(open('test/cpp_out.csv')) if r[0].startswith('2026-08')}
+except FileNotFoundError:
+    LUNAR={}; print("  (跳過農曆：先跑 g++ -O2 -I test -o test/lunar_test test/lunar_test.cpp && test/lunar_test > test/cpp_out.csv)")
+if LUNAR: print("  農曆 2026/8:", " ".join(f"{k}={v}" for k,v in sorted(LUNAR.items())[:6]), "...")
 f='font-family="Noto Sans CJK TC, DejaVu Sans, sans-serif"'
 s=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
    f'<rect width="{W}" height="{H}" fill="#fff"/>',
